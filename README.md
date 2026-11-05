@@ -10,4 +10,14 @@ Open `index.html` in a browser.
 
 `?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word.
 
-Layer 1 is the requested attitude. Layer 2 counters the rate and slews with drag. Layer 3 is the rebound plus the landing blend toward the next recorded key.
+Layer 1 is the requested attitude. Layer 2 counters the cleaned rate and slews with drag. Layer 3 is the rebound plus the landing blend toward the next recorded key.
+
+Rays follow the Sionna RT path shape: vertices plus an interaction. Line of sight is the travel. Specular is the counter-balance. Diffraction is a sharp bend. The force ray is the belly, scaled by the gauge. [Sionna RT](https://github.com/NVlabs/sionna-rt) does not run in the page. A low-pass differentiator cleans the rate those rays use.
+
+Coordinates publish on `BroadcastChannel('sphere-coords')` and on `window.SphereTether.latest`. Each fix has `l1`, `l2`, and `l3` in degrees, a unit vector, and a projection pair in about −1…1. Start the relay for another device or a projector:
+
+```
+node tether/server.mjs
+```
+
+Senders and receivers use `ws://127.0.0.1:9741/sphere`. `GET /coords` is the last fix. The process prints the LAN address.
