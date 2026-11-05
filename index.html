@@ -330,7 +330,8 @@
       ['Simulation MPC', 'https://erlendcoates.github.io/autonomy-playground/simulation-based-mpc/', 'External playground. The horizon line is the next recorded keys, not that solver']
     ]],
     ['Body', [
-      ['ssio-imu', 'https://ssio-imu.github.io', 'IMU work. Gyro and residual below are the estimator in roadster-bloch.js'],
+      ['ssio-imu', 'https://ssio-imu.github.io', 'Self-supervised inertial odometry. The flake gauge uses the six-spoke shape. SSIO does not run here'],
+      ['fig. 1', 'https://ssio-imu.github.io/images/fig1_corrected_legend.png', 'Published velocity error on six datasets. This gauge is the sample bearing, not those metres per second'],
       ['Magnetic muscle sensors', 'https://news.mit.edu/2026/magnetic-sensors-track-muscle-movement-better-prosthetic-limb-control-1029', 'MIT, prosthetic control. No muscle signal is invented here'],
       ['EMG note', 'https://www.linkedin.com/posts/dalton-moore-compneuro_at-memoriesai-we-are-developing-an-emg-based-ugcPost-7521341490837778432-r5YB/', 'Memories.ai EMG post. Not run here'],
       ['BCI workshop', 'https://www.gtec.at/event/bci-workshop-at-sfn-2026/?trk=public_post_comment-text', 'g.tec, SfN 2026. Not run here']
@@ -898,6 +899,95 @@
   function strokeBasis(ctx, basis, radius, R, front, style) {
     strokeRing(ctx, ring3(basis.y, basis.z, radius, R), front, style);
     strokeRing(ctx, ring3(basis.x, basis.z, radius, R), front, style);
+  }
+  // Six fixed bearings. Arm length is alignment of this sample, not a published error.
+  function flakeLobe(pitch, yaw, theta) {
+    const horiz = Math.max(0, Math.cos(pitch));
+    const align = Math.cos(wrapAng(yaw - theta));
+    return clamp(0.38 + 0.62 * (0.5 + 0.5 * align) * (0.35 + 0.65 * horiz), 0, 1);
+  }
+  function flakeArms(pitch, yaw) {
+    const arms = [];
+    for (let i = 0; i < 6; i++) arms.push(flakeLobe(pitch, yaw, i * Math.PI / 3));
+    return arms;
+  }
+  function drawFlake(ctx, cx, cy, R, pose) {
+    const font = '"Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif';
+    const rad = R * 0.90;
+    const yaw1 = pose.yaw + camYaw;
+    const pitch1 = pose.pitch + camPitch;
+    const arms1 = flakeArms(pitch1, yaw1);
+    const arms2 = flakeArms(shell.pitch, shell.yaw);
+    function at(i, t) {
+      const a = -Math.PI / 2 + (i % 6) * Math.PI / 3;
+      return [cx + Math.cos(a) * rad * t, cy + Math.sin(a) * rad * t];
+    }
+    function ring(t) {
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const p = at(i, t);
+        if (i === 0) ctx.moveTo(p[0], p[1]);
+        else ctx.lineTo(p[0], p[1]);
+      }
+      ctx.stroke();
+    }
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#2a2a2a';
+    ring(0.25);
+    ring(0.5);
+    ring(0.75);
+    ring(1);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const p = at(i, 1);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(p[0], p[1]);
+    }
+    ctx.stroke();
+    function poly(arms, stroke, fill) {
+      ctx.beginPath();
+      for (let i = 0; i <= 6; i++) {
+        const p = at(i, arms[i % 6]);
+        if (i === 0) ctx.moveTo(p[0], p[1]);
+        else ctx.lineTo(p[0], p[1]);
+      }
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.setLineDash(stroke.dash);
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    poly(arms1, { color: '#f4f4f4', width: 1.7, dash: [] }, 'rgba(255,255,255,0.07)');
+    poly(arms2, { color: 'rgba(255,255,255,0.80)', width: 1.25, dash: [5, 4] }, 'rgba(255,255,255,0.03)');
+    const dir = -Math.PI / 2 + yaw1;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(dir) * rad * 0.90, cy + Math.sin(dir) * rad * 0.90);
+    ctx.lineTo(cx + Math.cos(dir) * rad * 1.08, cy + Math.sin(dir) * rad * 1.08);
+    ctx.strokeStyle = '#f7f7f7';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#8d8d8d';
+    ctx.font = '500 ' + Math.max(10, Math.round(R * 0.085)) + 'px ' + font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 6; i++) {
+      const p = at(i, 1.16);
+      ctx.fillText(String(i * 60), p[0], p[1]);
+    }
+    let deg = (yaw1 * 180 / Math.PI) % 360;
+    if (deg < 0) deg += 360;
+    ctx.fillStyle = '#f5f5f5';
+    ctx.font = '500 ' + Math.round(R * 0.10) + 'px ' + font;
+    ctx.fillText('DIR', cx, cy - R * 0.10);
+    ctx.font = '300 ' + Math.round(R * 0.22) + 'px ' + font;
+    ctx.fillText(Math.round(deg) + '°', cx, cy + R * 0.08);
+    ctx.fillStyle = '#9a9a9a';
+    ctx.font = '400 ' + Math.max(10, Math.round(R * 0.075)) + 'px ' + font;
+    ctx.fillText('L1  L2', cx, cy + R * 0.28);
+    return { bearing: Math.round(deg * 10) / 10, l1: arms1, l2: arms2 };
   }
   function drawArc(ctx, cx, cy, R, frac) {
     const sweep = 248 * Math.PI / 180;
@@ -1483,6 +1573,11 @@
         y: round3(h.y),
         pinch: round3(h.pinch)
       })),
+      flake: {
+        bearing: deg1(pose.yaw + camYaw),
+        l1: flakeArms(pose.pitch + camPitch, pose.yaw + camYaw).map(round3),
+        l2: flakeArms(shell.pitch, shell.yaw).map(round3)
+      },
       map: mapView ? {
         sites: MAP_N,
         refused: mapView.chain.refused,
@@ -1521,6 +1616,9 @@
       }
       if (coords.hands.length) {
         read.textContent += '\nhands ' + coords.hands.map((h) => h.side + ' ' + h.pinch.toFixed(2)).join('  ');
+      }
+      if (coords.flake) {
+        read.textContent += '\nflake ' + coords.flake.bearing.toFixed(1) + '°';
       }
       if (coords.map) {
         read.textContent += '\nmap ' + (coords.map.refused ? ('refused ' + coords.map.refused) : (coords.map.sites + '  peak ' + coords.map.peak.toFixed(2) + '  angle ' + coords.map.angle.toFixed(1) + '°'));
@@ -1566,11 +1664,15 @@
     ctx.beginPath();
     ctx.rect(0, y, w, h);
     ctx.clip();
-    let R = Math.min(w * 0.34, h * 0.36);
-    if (R * 4.85 > w * 0.96) R = (w * 0.96) / 4.85;
+    const flakeOn = !plateOn;
+    const slots = flakeOn ? 3 : 2;
+    let R = Math.min(w * (flakeOn ? 0.22 : 0.34), h * 0.36);
+    const unit = 2 + 0.85;
+    if (R * (slots * unit - 0.85) > w * 0.96) R = (w * 0.96) / (slots * unit - 0.85);
     const gap = R * 0.85;
-    const gx = w / 2 - gap / 2 - R;
-    const sx = w / 2 + gap / 2 + R;
+    const step = R * 2 + gap;
+    const gx = flakeOn ? w / 2 - step : w / 2 - gap / 2 - R;
+    const sx = flakeOn ? w / 2 + step : w / 2 + gap / 2 + R;
     const cy = y + h * 0.50;
     const max = pose.mode === 'df' ? 5000 : 3;
     drawArc(ctx, gx, cy, R, pose.v / max);
@@ -1585,6 +1687,7 @@
     ctx.font = '400 ' + Math.round(R * 0.095) + 'px ' + font;
     ctx.fillStyle = '#cfcfcf';
     ctx.fillText(pose.mode === 'df' ? 'KG' : 'G', gx, cy + R * 0.30);
+    if (flakeOn) drawFlake(ctx, w / 2, cy, R, pose);
     drawSphere(ctx, sx, cy, R, viewNose, viewTrail, nextNose, wordPts, menuName === 'map' && !plateOn);
     ctx.restore();
   }

@@ -14,6 +14,8 @@ Track opens the camera. A wire head and two wire hands sit in the same black fra
 
 Map draws 256 sites on this sphere from the same sample. The chain is sample, rate, layers, map. A missing stage is refused by name. The detector uses the projection already on the tether and shows the angle between the requested nose and the counter. [g.Pangolin](https://www.gtec.at/2024/11/05/g-pangolin-ultra-high-density-eeg-system/), [g.Pype](https://gpype.gtec.at), and [FleXray](https://flexray.csail.mit.edu) stay as links. They do not run in the page.
 
+The stage adds a six-spoke direction gauge beside the force arc. Spoke length is how this sample aligns with 0°, 60°, 120°, 180°, 240°, and 300°. The solid polygon is the requested bearing. The dashed polygon is the counter. A tick marks the bearing. The shape follows the radar in [SSIO figure 1](https://ssio-imu.github.io/images/fig1_corrected_legend.png). [SSIO](https://ssio-imu.github.io) does not run in the page, and the arms are not that figure's velocity errors. `?plate=1` keeps the force arc and the sphere.
+
 `?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word. `?sources=1` opens the drawer.
 
 Layer 1 is the requested attitude. Layer 2 counters the cleaned rate and slews with drag. Layer 3 is the rebound plus the landing blend toward the next recorded key.
