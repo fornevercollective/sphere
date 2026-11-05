@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sphere — attitude</title>
+<style>
+  :root { --dock: 200px; --plate: 168px; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #eee;
+    font: 13px/1.35 "Avenir Next", "Helvetica Neue", Helvetica, sans-serif; }
+  canvas#cv { display: block; width: 100%; height: 100%; touch-action: none; }
+  #bar {
+    position: fixed; z-index: 3; top: 0; left: 0; right: 0;
+    display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: center;
+    padding: 8px 12px;
+    background: #000;
+    border-bottom: 1px solid #161616;
+  }
+  #bar span.k { color: #5a5a5a; letter-spacing: 0.14em; font-size: 10px; margin-left: 8px; }
+  #bar .brand { color: #f5f5f5; letter-spacing: 0.2em; font-size: 11px; font-weight: 500; margin-right: 4px; }
+  #bar a { color: #8d8d8d; text-decoration: none; padding: 3px 6px; letter-spacing: 0.04em; }
+  #bar a:hover { color: #f5f5f5; }
+  button {
+    background: transparent; color: #8d8d8d; border: 0; font: inherit;
+    letter-spacing: 0.04em; cursor: pointer; padding: 3px 6px;
+  }
+  button.on { color: #f5f5f5; }
+  #hint {
+    position: fixed; left: 16px; bottom: calc(var(--dock) + var(--plate) + 6px); z-index: 3;
+    color: #4a4a4a; font-size: 11px; letter-spacing: 0.08em;
+  }
+  #dock {
+    position: fixed; z-index: 3; left: 0; right: 0; bottom: 0; height: var(--dock);
+    display: grid; grid-template-columns: 1.15fr 1.4fr 0.95fr 1.05fr; gap: 16px;
+    box-sizing: border-box; padding: 10px 16px 12px;
+    background: #000; border-top: 1px solid #242424; pointer-events: none;
+  }
+  #dock section { min-width: 0; overflow: hidden; }
+  #dock h2 {
+    margin: 0 0 4px; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; color: #6e6e6e;
+  }
+  #dock p { margin: 0 0 3px; color: #dedede; font-size: 12px; font-weight: 300; }
+  #dock .dim { color: #8a8a8a; }
+  #dock .split { display: flex; gap: 8px; align-items: flex-start; }
+  #dock .split div { min-width: 0; }
+  #ev-wave { width: 100%; height: 58px; display: block; margin-top: 4px; }
+  #bl-spark { width: 100%; height: 42px; display: block; margin-top: 4px; }
+  #cube-cv { width: 112px; height: 112px; flex: none; }
+  #sheet {
+    position: fixed; z-index: 4; display: none;
+    top: 48px; right: 12px; bottom: calc(var(--dock) + var(--plate) + 8px); width: min(440px, 94vw);
+    overflow: auto; background: #070707; border: 1px solid #2a2a2a; padding: 8px 18px 28px;
+  }
+  #sheet.open { display: block; }
+  #sheet h2 { font-weight: 500; font-size: 11px; letter-spacing: 0.16em; color: #777; margin: 18px 0 6px; }
+  #sheet a { color: #e8e8e8; text-decoration: none; }
+  #sheet a:hover { text-decoration: underline; }
+  #sheet li { margin: 7px 0; color: #9a9a9a; }
+  #sheet .lead { color: #9a9a9a; margin: 10px 0 0; }
+  #board {
+    position: fixed; z-index: 4; display: none;
+    top: 46px; left: 12px; width: min(420px, 46vw);
+    bottom: calc(var(--dock) + var(--plate) + 12px);
+    overflow: auto; background: #070707; border: 1px solid #2a2a2a;
+    padding: 8px 14px 18px; box-sizing: border-box;
+  }
+  #board.open { display: block; }
+  #board h2 { font-weight: 500; font-size: 11px; letter-spacing: 0.16em; color: #777; margin: 16px 0 6px; }
+  #board p { margin: 0 0 8px; color: #dedede; }
+  #board .dim { color: #8a8a8a; }
+  #board input {
+    width: 100%; box-sizing: border-box; margin: 0 0 8px;
+    background: #000; color: #f4f4f4; border: 1px solid #2a2a2a;
+    font: inherit; letter-spacing: 0.08em; padding: 8px 10px;
+  }
+  #board .flow { letter-spacing: 0.12em; color: #f4f4f4; }
+  #flow-list { white-space: pre-wrap; color: #cfcfcf; }
+  #kb { width: 100%; height: auto; display: block; background: #000; margin: 0 0 8px; }
+  #board .row { display: flex; gap: 10px; align-items: flex-start; }
+  #codex-cube { width: 148px; height: auto; flex: none; background: #000; }
+  #flow-list { font-size: 12px; line-height: 1.45; }
+  @media (max-width: 980px) {
+    :root { --dock: 46vh; --plate: 148px; }
+    #dock { grid-template-columns: 1fr 1fr; height: var(--dock); overflow: auto; }
+  }
+  body.plate { --dock: 0px; }
+  body.plate #bar,
+  body.plate #hint,
+  body.plate #dock,
+  body.plate #sheet,
+  body.plate #board { display: none !important; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="brand">SPHERE</span>
+  <button type="button" data-menu="sphere" class="on">Sphere</button>
+  <button type="button" data-menu="bloch">Bloch</button>
+  <button type="button" data-menu="path">Path</button>
+  <button type="button" data-menu="codex">Codex</button>
+  <button type="button" data-menu="cube">Cube</button>
+  <button type="button" data-menu="flow">Flow</button>
+  <span class="k">SET</span>
+  <button type="button" data-set="event">Event</button>
+  <button type="button" data-set="bloch">Bloch</button>
+  <button type="button" data-set="v1">v1</button>
+  <span class="k">PART</span>
+  <button type="button" data-part="rings" class="on">Rings</button>
+  <button type="button" data-part="nose" class="on">Nose</button>
+  <button type="button" data-part="trail" class="on">Trail</button>
+  <button type="button" data-part="shadow" class="on">Shadow</button>
+  <button type="button" data-part="horizon" class="on">Horizon</button>
+  <span class="k">LAYER</span>
+  <button type="button" data-part="l1" class="on">L1</button>
+  <button type="button" data-part="l2" class="on">L2</button>
+  <button type="button" data-part="l3" class="on">L3</button>
+  <a href="https://lang.ugrad.ai/zen.html">Zen</a>
+  <a href="https://kbatch.ugrad.ai">KBatch</a>
+  <a href="https://mueee.qbitos.ai/qbit-globe.html">Globe</a>
+  <button type="button" id="sources">Sources</button>
+</div>
+<canvas id="cv"></canvas>
+<div id="hint">event pass drives the gauge · space pauses</div>
+<footer id="dock">
+  <section>
+    <h2>EVENT PASS</h2>
+    <p id="ev-val"></p>
+    <p id="ev-pose"></p>
+    <p id="ev-next"></p>
+    <p id="ev-note" class="dim"></p>
+    <canvas id="ev-wave" width="360" height="72"></canvas>
+  </section>
+  <section>
+    <h2>BLOCH RETURN</h2>
+    <p id="bl-state"></p>
+    <p id="bl-amp"></p>
+    <p id="bl-imu"></p>
+    <p id="bl-q"></p>
+    <p id="bl-bus"></p>
+    <p id="bl-log" class="dim"></p>
+    <canvas id="bl-spark" width="360" height="64"></canvas>
+  </section>
+  <section>
+    <h2>V1 SENSORS</h2>
+    <p id="v1-main"></p>
+    <p id="v1-range"></p>
+    <p id="v1-ch" class="dim"></p>
+  </section>
+  <section>
+    <h2>PATH · NOSE CUBE</h2>
+    <div class="split">
+      <div>
+        <p id="path-main"></p>
+        <p id="path-eff"></p>
+        <p id="path-sh"></p>
+        <p id="path-note" class="dim"></p>
+        <p id="path-word"></p>
+      </div>
+      <canvas id="cube-cv" width="160" height="160"></canvas>
+    </div>
+  </section>
+</footer>
+<aside id="sheet"></aside>
+<aside id="board">
+  <h2>CODEX</h2>
+  <p class="dim">One QWERTY. Efficiency is 100 minus average key distance times 22. Zen, KBatch, and the globe stay on their pages.</p>
+  <input id="word" type="text" maxlength="64" spellcheck="false" autocomplete="off" value="sphere" aria-label="Word">
+  <p id="codex-met"></p>
+  <p id="codex-flow" class="flow"></p>
+  <canvas id="kb" width="720" height="188"></canvas>
+  <div class="row">
+    <canvas id="codex-cube" width="320" height="280"></canvas>
+    <div>
+      <h2 id="flow-head">FLOW</h2>
+      <p id="flow-list"></p>
+    </div>
+  </div>
+</aside>
+<script src="js/roadster-bloch.js"></script>
+<script>
+(function () {
+  // Gauge and sphere read sample() for the selected set.
+  // The dock always returns the other two datasets from the same clock.
+  const EVENT = [
+    { t: 0, pitch: 24, yaw: -88, roll: 0, mode: 'df', v: 4698 },
+    { t: 4, pitch: 28, yaw: -82, roll: 0, mode: 'df', v: 4700 },
+    { t: 8, pitch: 46, yaw: -74, roll: 2, mode: 'df', v: 4706 },
+    { t: 11, pitch: 76, yaw: -70, roll: 4, mode: 'df', v: 4706 },
+    { t: 13, pitch: 42, yaw: 28, roll: 4, mode: 'df', v: 3880 },
+    { t: 14, pitch: 30, yaw: 48, roll: 2, mode: 'df', v: 3107 },
+    { t: 15.2, pitch: 16, yaw: 72, roll: 0, mode: 'df', v: 2244 },
+    { t: 17.2, pitch: 10, yaw: 140, roll: 0, mode: 'df', v: 1012 },
+    { t: 19, pitch: 8, yaw: 156, roll: -2, mode: 'g', v: 1.0 },
+    { t: 22, pitch: 8, yaw: 164, roll: 0, mode: 'g', v: 1.0 },
+    { t: 24, pitch: 12, yaw: 150, roll: 2, mode: 'g', v: 1.1 },
+    { t: 26, pitch: 40, yaw: 118, roll: 4, mode: 'g', v: 1.3 },
+    { t: 27.6, pitch: 80, yaw: 96, roll: 0, mode: 'g', v: 0.9 },
+    { t: 29, pitch: 50, yaw: 82, roll: 0, mode: 'g', v: 0.9 },
+    { t: 30.2, pitch: 22, yaw: 64, roll: 0, mode: 'g', v: 1.0 },
+    { t: 31, pitch: -4, yaw: 22, roll: 4, mode: 'g', v: 0.4 },
+    { t: 32, pitch: 14, yaw: -62, roll: 0, mode: 'g', v: 1.7 },
+    { t: 35, pitch: 8, yaw: -48, roll: 0, mode: 'g', v: 1.1 },
+    { t: 38, pitch: 24, yaw: -88, roll: 0, mode: 'df', v: 4698 }
+  ];
+  const LOOP = 38;
+  const V1 = { pitch: 106, roll: 0, yaw: 0, downforceKg: 4706, altitudeFt: 51.4 };
+  const V1_CHANNELS = 'IMU attitude · downforce is pressure times area, or four fans and skirts · altitude mixes baro, GPS, laser, radar, and IMU, and the mix lags · tank pressure example 5500 PSI · wheel speed · suspension';
+
+  const SOURCES = [
+    ['This page', [
+      ['Event pass', 'data/roadster-event-pass.json', '38s gauge and nose, read from the recording. The dock replays these keys'],
+      ['Bloch estimator', 'js/roadster-bloch.js', 'Pitch anchored at 106°. Plant plus Mahony. The dock returns θ, φ, sparks, and residual'],
+      ['v1 sensors', 'data/roadster-v1-sensors.json', 'Still. Pitch 106°, 4706 kg, altitude 51.4 ft']
+    ]],
+    ['Composer', [
+      ['composer', 'https://github.com/fornevercollective/composer', 'Offline OpenQASM workpad. Amplitudes below use the same θ, φ map'],
+      ['quantum gutter', 'https://mueee.qbitos.ai/quantum-gutter.html', 'Prefix lane. The posted bloch-state line is the token this page actually sends']
+    ]],
+    ['Nav', [
+      ['Zen', 'https://lang.ugrad.ai/zen.html', 'Translator. Linked in the bar. It does not run in this page'],
+      ['KBatch', 'https://kbatch.ugrad.ai', 'Path geometry. The codex uses its short-hop rule on one QWERTY'],
+      ['Globe', 'https://mueee.qbitos.ai/qbit-globe.html', 'The menu follows that page. The letter wheel stays there']
+    ]],
+    ['KBatch', [
+      ['kbatch', 'https://kbatch.ugrad.ai', 'Path geometry. Trail efficiency below uses the short-hop rule, on the nose trail'],
+      ['cube viewer', 'https://kbatch.ugrad.ai/data/declaration/cube-viewer', 'Declaration cube. The cube here is only this nose'],
+      ['for AI', 'https://kbatch.ugrad.ai/for-ai', 'MCP tools, shadows, chart geometry'],
+      ['waveform letters', 'https://kbatch.ugrad.ai/labs/waveform-letters', 'Arc strip. The arc below is the gauge series, not audio and not letters'],
+      ['shadow', 'https://kbatch.ugrad.ai/shadow', 'Layout shadows. The dot in the sphere is this nose dropped onto the equator'],
+      ['dojo', 'https://kbatch.ugrad.ai/dojo/', 'DOJO console']
+    ]],
+    ['Machine', [
+      ['teardown', 'https://github.com/elvarofficial/teardown', 'One model, panels read it, a button per part. That is how this page is split'],
+      ['teardown note', 'https://x.com/elvar_official/status/2116174609355571402', 'The post that states the rule'],
+      ['Unitree clip', 'https://x.com/jav6868/status/2117548098075660739', 'The robot clip. Not driven from here'],
+      ['Handheld lidar', 'https://x.com/ardchain/status/2116649091820322871', 'Distance and a point map. The range below is the angle to the v1 nose, not that map'],
+      ['Simulation MPC', 'https://erlendcoates.github.io/autonomy-playground/simulation-based-mpc/', 'External playground. The horizon line is the next recorded keys, not that solver']
+    ]],
+    ['Body', [
+      ['ssio-imu', 'https://ssio-imu.github.io', 'IMU work. Gyro and residual below are the estimator in roadster-bloch.js'],
+      ['Magnetic muscle sensors', 'https://news.mit.edu/2026/magnetic-sensors-track-muscle-movement-better-prosthetic-limb-control-1029', 'MIT, prosthetic control. No muscle signal is invented here'],
+      ['EMG note', 'https://www.linkedin.com/posts/dalton-moore-compneuro_at-memoriesai-we-are-developing-an-emg-based-ugcPost-7521341490837778432-r5YB/', 'Memories.ai EMG post. Not run here'],
+      ['BCI workshop', 'https://www.gtec.at/event/bci-workshop-at-sfn-2026/?trk=public_post_comment-text', 'g.tec, SfN 2026. Not run here']
+    ]],
+    ['Vision', [
+      ['vision-demos', 'https://github.com/jeremyipark/vision-demos', 'Demos. Not run here'],
+      ['FlexGlue', 'https://github.com/cvg/FlexGlue', 'CVG. Not run here'],
+      ['SplatThumb', 'https://github.com/VoxelKei/SplatThumb', 'Splats. Not run here'],
+      ['PlateToAOVs', 'https://github.com/Mariolepipe/PlateToAOVs', 'AOVs. Not run here'],
+      ['RelationVGGT', 'https://relationvggt.github.io', 'Relation VGGT. Not run here'],
+      ['ReLift3D', 'https://relift3d.github.io', 'ReLift3D. Not run here'],
+      ['Basketball CV', 'https://www.linkedin.com/posts/luis-condados_computervision-sportsanalytics-basketball-ugcPost-7517394361421307904-JSng/', 'Sports vision post. Not run here']
+    ]]
+  ];
+
+  const params = new URLSearchParams(location.search);
+  const cv = document.getElementById('cv');
+  const hint = document.getElementById('hint');
+  const sheet = document.getElementById('sheet');
+  const el = {
+    evVal: document.getElementById('ev-val'),
+    evPose: document.getElementById('ev-pose'),
+    evNext: document.getElementById('ev-next'),
+    evNote: document.getElementById('ev-note'),
+    blState: document.getElementById('bl-state'),
+    blAmp: document.getElementById('bl-amp'),
+    blImu: document.getElementById('bl-imu'),
+    blBus: document.getElementById('bl-bus'),
+    blLog: document.getElementById('bl-log'),
+    v1Main: document.getElementById('v1-main'),
+    v1Range: document.getElementById('v1-range'),
+    v1Ch: document.getElementById('v1-ch'),
+    pathMain: document.getElementById('path-main'),
+    pathEff: document.getElementById('path-eff'),
+    pathSh: document.getElementById('path-sh'),
+    pathNote: document.getElementById('path-note'),
+    pathWord: document.getElementById('path-word'),
+    blQ: document.getElementById('bl-q'),
+    codexMet: document.getElementById('codex-met'),
+    codexFlow: document.getElementById('codex-flow'),
+    flowList: document.getElementById('flow-list')
+  };
+  const board = document.getElementById('board');
+  const wordInput = document.getElementById('word');
+  window.addEventListener('error', (e) => { hint.textContent = e.message || 'error'; });
+
+  let setName = params.get('set') || 'event';
+  if (setName !== 'bloch' && setName !== 'v1') setName = 'event';
+  let menuName = params.get('menu') || (setName === 'bloch' ? 'bloch' : 'sphere');
+  if (['sphere', 'bloch', 'path', 'codex', 'cube', 'flow'].indexOf(menuName) < 0) menuName = 'sphere';
+  if (!params.get('set') && menuName === 'bloch') setName = 'bloch';
+  if (params.get('word')) wordInput.value = params.get('word').slice(0, 64);
+  const parts = { rings: true, nose: true, trail: true, shadow: true, horizon: true, l1: true, l2: true, l3: true };
+  let t0 = performance.now() - (Number(params.get('t')) || 0) * 1000;
+  let paused = params.has('still');
+  let held = (Number(params.get('t')) || 0) * 1000;
+  let last = performance.now();
+  let camYaw = 0;
+  let camPitch = 0;
+  let drag = null;
+  let layerView = null;
+  const shell = {
+    pitch: 0, yaw: 0, rebPitch: 0, rebYaw: 0,
+    dragPitch: 0, dragYaw: 0
+  };
+  let plateOn = false;
+  let nextPlatePaint = 0;
+
+  function syncPlate() {
+    plateOn = params.get('plate') === '1';
+    document.body.classList.toggle('plate', plateOn);
+  }
+  let bloch = null;
+  let lastPost = 0;
+  let posted = null;
+  let echo = null;
+  let inbound = null;
+  let bus = null;
+  let ear = null;
+
+  function smooth(u) { return u * u * (3 - 2 * u); }
+  function deg(n) { return n * Math.PI / 180; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function d1(rad) { return (rad * 180 / Math.PI).toFixed(1); }
+  function noseFrom(pitch, yaw) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    return [cp * Math.cos(yaw), cp * Math.sin(yaw), sp];
+  }
+  function spin(n) {
+    if (!camYaw) return n;
+    const c = Math.cos(camYaw), s = Math.sin(camYaw);
+    return [n[0] * c - n[1] * s, n[0] * s + n[1] * c, n[2]];
+  }
+  function pitchShift(p, a) {
+    if (!a) return p;
+    const c = Math.cos(a), s = Math.sin(a);
+    return [p[0] * c - p[2] * s, p[1], p[0] * s + p[2] * c];
+  }
+  function orbit(p) { return spin(pitchShift(p, camPitch)); }
+  function wrapAng(a) {
+    const t = Math.PI * 2;
+    a = a % t;
+    if (a > Math.PI) a -= t;
+    if (a < -Math.PI) a += t;
+    return a;
+  }
+  function basisOf(pitch, yaw, roll) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cr = Math.cos(roll), sr = Math.sin(roll);
+    function apply(x, y, z) {
+      const y1 = y * cr - z * sr;
+      const z1 = y * sr + z * cr;
+      const x2 = x * cp + z1 * sp;
+      const z2 = x * sp - z1 * cp;
+      return [x2 * cy - y1 * sy, x2 * sy + y1 * cy, z2];
+    }
+    return { x: apply(1, 0, 0), y: apply(0, 1, 0), z: apply(0, 0, 1) };
+  }
+  function eventRate(sec) {
+    const a = eventAt(sec);
+    const b = eventAt(sec + 0.08);
+    return {
+      pitch: clamp((b.pitch - a.pitch) / 0.08, -4, 4),
+      yaw: clamp(wrapAng(b.yaw - a.yaw) / 0.08, -4, 4)
+    };
+  }
+  function eventAccel(sec) {
+    const a = eventRate(sec);
+    const b = eventRate(sec + 0.08);
+    return {
+      pitch: clamp((b.pitch - a.pitch) / 0.08, -12, 12),
+      yaw: clamp((b.yaw - a.yaw) / 0.08, -12, 12)
+    };
+  }
+  // L1 is the requested attitude. L2 lags it: gyro counter is −rate×0.55s, drag is the 0.38s slew.
+  // L3 rebound is −accel×0.02s², and the landing blends that with the next recorded key.
+  function stepLayers(dt, reqPitch, reqYaw, roll, nextKey) {
+    const decay = dt > 0 ? Math.exp(-dt / 0.12) : 0.2;
+    shell.dragPitch *= decay;
+    shell.dragYaw *= decay;
+    let wPitch = shell.dragPitch;
+    let wYaw = shell.dragYaw;
+    let acc = { pitch: 0, yaw: 0 };
+    if (setName === 'event') {
+      const r = eventRate(held / 1000);
+      wPitch += r.pitch;
+      wYaw += r.yaw;
+      acc = eventAccel(held / 1000);
+    } else if (bloch && bloch.gyro) {
+      wPitch += bloch.gyro.wy;
+      wYaw += bloch.gyro.wz;
+    }
+    wPitch = clamp(wPitch, -6, 6);
+    wYaw = clamp(wYaw, -6, 6);
+    const kickP = clamp(-0.02 * acc.pitch, -0.5, 0.5);
+    const kickY = clamp(-0.02 * acc.yaw, -0.5, 0.5);
+    const targetPitch = reqPitch - 0.55 * wPitch;
+    const targetYaw = reqYaw - 0.55 * wYaw;
+    if (!shell.ready) {
+      shell.pitch = targetPitch;
+      shell.yaw = targetYaw;
+      shell.rebPitch = kickP;
+      shell.rebYaw = kickY;
+      shell.ready = true;
+    } else {
+      const follow = dt > 0 ? 1 - Math.exp(-dt / 0.38) : 1;
+      shell.pitch += (targetPitch - shell.pitch) * follow;
+      shell.yaw += wrapAng(targetYaw - shell.yaw) * follow;
+      const rebFollow = dt > 0 ? 1 - Math.exp(-dt / 0.45) : 1;
+      shell.rebPitch += (kickP - shell.rebPitch) * rebFollow;
+      shell.rebYaw += (kickY - shell.rebYaw) * rebFollow;
+    }
+    let landP = reqPitch + wPitch * 0.4 + shell.rebPitch;
+    let landY = reqYaw + wYaw * 0.4 + shell.rebYaw;
+    if (nextKey) {
+      landP = landP * 0.45 + deg(nextKey.pitch) * 0.55;
+      landY = landY * 0.45 + deg(nextKey.yaw) * 0.55;
+    }
+    const nose = noseFrom(reqPitch, reqYaw);
+    const landNose = noseFrom(landP, landY);
+    const path = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const d = clamp(dot(nose, landNose), -1, 1);
+      const th = Math.acos(d);
+      let p;
+      if (th < 1e-4) p = nose.slice();
+      else {
+        const s = Math.sin(th);
+        const u = Math.sin((1 - t) * th) / s;
+        const v = Math.sin(t * th) / s;
+        p = [nose[0] * u + landNose[0] * v, nose[1] * u + landNose[1] * v, nose[2] * u + landNose[2] * v];
+      }
+      path.push(p);
+    }
+    const amp = blochOf(nose);
+    const lag = Math.hypot(wrapAng(shell.pitch - reqPitch), wrapAng(shell.yaw - reqYaw));
+    const reb = Math.hypot(shell.rebPitch, shell.rebYaw);
+    layerView = {
+      b1: basisOf(reqPitch, reqYaw, roll),
+      b2: basisOf(shell.pitch, shell.yaw, roll),
+      b3: basisOf(landP, landY, roll),
+      landNose: landNose,
+      path: path,
+      lagDeg: (lag * 180 / Math.PI).toFixed(1),
+      rebDeg: (reb * 180 / Math.PI).toFixed(1),
+      landDeg: (landP * 180 / Math.PI).toFixed(1),
+      theta: amp.theta,
+      phi: amp.phi,
+      p0: amp.p0,
+      p1: amp.p1,
+      shadow: Math.hypot(nose[0], nose[1]),
+      range: Math.acos(clamp(dot(nose, noseFrom(deg(V1.pitch), 0)), -1, 1)),
+      wPitch: wPitch,
+      wYaw: wYaw
+    };
+  }
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function fmtVal(mode, v) {
+    if (mode === 'df') return Math.round(v) + ' kg';
+    return Number(v).toFixed(1) + ' g';
+  }
+  function eventAt(sec) {
+    let t = ((sec % LOOP) + LOOP) % LOOP;
+    let i = 0;
+    while (i < EVENT.length - 2 && EVENT[i + 1].t <= t) i++;
+    const a = EVENT[i], b = EVENT[i + 1];
+    const u = smooth(Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t || 1))));
+    const cut = a.mode !== b.mode;
+    const use = !cut || u < 0.5 ? a : b;
+    const next = EVENT[Math.min(i + 1, EVENT.length - 1)];
+    return {
+      t: t,
+      pitch: deg(a.pitch + (b.pitch - a.pitch) * u),
+      yaw: deg(a.yaw + (b.yaw - a.yaw) * u),
+      roll: deg(a.roll + (b.roll - a.roll) * u),
+      mode: use.mode,
+      v: cut ? use.v : a.v + (b.v - a.v) * u,
+      alt: null,
+      next: next.t >= LOOP ? null : next,
+      source: 'event'
+    };
+  }
+  function upcoming(sec) {
+    const t = ((sec % LOOP) + LOOP) % LOOP;
+    const ahead = EVENT.filter((k) => k.t < LOOP && k.t > t + 0.04);
+    if (ahead.length >= 3) return ahead.slice(0, 3);
+    const head = EVENT.filter((k) => k.t < LOOP && k.t <= t + 0.04);
+    return ahead.concat(head).slice(0, 3);
+  }
+  function ensureBloch() {
+    if (bloch || !window.RoadsterBloch) return;
+    bloch = window.RoadsterBloch.create({ pitchDeg: 106, seed: 2 });
+  }
+  function sample() {
+    if (setName === 'v1') {
+      return {
+        t: 0, pitch: deg(V1.pitch), yaw: 0, roll: deg(V1.roll),
+        mode: 'df', v: V1.downforceKg, alt: V1.altitudeFt, next: null, source: 'v1'
+      };
+    }
+    if (setName === 'bloch') {
+      ensureBloch();
+      if (!bloch) {
+        return { t: 0, pitch: deg(106), yaw: 0, roll: 0, mode: 'df', v: 4706, alt: 51.4, next: null, source: 'bloch' };
+      }
+      return {
+        t: bloch.t,
+        pitch: bloch.pitch,
+        yaw: bloch.yaw,
+        roll: bloch.roll,
+        mode: 'df',
+        v: bloch.downforce,
+        alt: bloch.alt,
+        nose: bloch.nose.slice(),
+        theta: bloch.theta,
+        phi: bloch.phi,
+        residual: bloch.residual,
+        next: null,
+        source: 'bloch'
+      };
+    }
+    return eventAt(held / 1000);
+  }
+  function shownTrail() {
+    if (setName === 'v1') return [noseFrom(deg(V1.pitch), 0)];
+    if (setName === 'bloch' && bloch) {
+      const pts = [];
+      const a = bloch.trail;
+      const start = Math.max(0, a.length - 220 * 3);
+      for (let i = start; i + 2 < a.length; i += 3) pts.push([a[i], a[i + 1], a[i + 2]]);
+      return smoothTrail(pts);
+    }
+    const sec = ((held / 1000) % LOOP + LOOP) % LOOP;
+    const steps = 240;
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const s = eventAt(sec * (i / steps));
+      pts.push(noseFrom(s.pitch, s.yaw));
+    }
+    return smoothTrail(pts);
+  }
+  function unit3(p) {
+    const n = Math.hypot(p[0], p[1], p[2]) || 1;
+    return [p[0] / n, p[1] / n, p[2] / n];
+  }
+  function slerp(a, b, t) {
+    const th = Math.acos(clamp(dot(a, b), -1, 1));
+    if (th < 1e-4) return a.slice();
+    const s = Math.sin(th);
+    const u = Math.sin((1 - t) * th) / s;
+    const v = Math.sin(t * th) / s;
+    return [a[0] * u + b[0] * v, a[1] * u + b[1] * v, a[2] * u + b[2] * v];
+  }
+  // Two passes along the arc. Endpoints stay on the sample so the nose still owns the tip.
+  // A reversal stays a turn. It does not become a chord that reads as slip.
+  function smoothTrail(pts) {
+    if (!pts || pts.length < 5) return (pts || []).map(unit3);
+    let cur = pts.map(unit3);
+    for (let pass = 0; pass < 2; pass++) {
+      const next = cur.map((p) => p.slice());
+      for (let i = 1; i < cur.length - 1; i++) {
+        next[i] = slerp(cur[i], slerp(cur[i - 1], cur[i + 1], 0.5), 0.35);
+      }
+      cur = next;
+    }
+    return cur;
+  }
+  // Short-hop score, same rule as KBatch analyzeMetrics (100 − avgHop × 22).
+  // One unit on this trail is a 0.05 chord of the nose, not a key width.
+  function trailMetrics(pts) {
+    const empty = { travel: 0, hops: 0, avgHop: 0, efficiency: 100, strain: 0 };
+    if (pts.length < 2) return empty;
+    const UNIT = 0.05;
+    let travel = 0;
+    const marks = [pts[0]];
+    let anchor = pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      travel += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]);
+      if (Math.hypot(pts[i][0] - anchor[0], pts[i][1] - anchor[1], pts[i][2] - anchor[2]) >= UNIT) {
+        marks.push(pts[i]);
+        anchor = pts[i];
+      }
+    }
+    let turn = 0, turns = 0, prevDir = null, hops = 0, hopSum = 0;
+    for (let i = 1; i < marks.length; i++) {
+      const dx = marks[i][0] - marks[i - 1][0];
+      const dy = marks[i][1] - marks[i - 1][1];
+      const dz = marks[i][2] - marks[i - 1][2];
+      const hop = Math.hypot(dx, dy, dz);
+      if (hop < 1e-4) continue;
+      hops++;
+      hopSum += hop;
+      const dir = [dx / hop, dy / hop, dz / hop];
+      if (prevDir) {
+        turn += Math.acos(clamp(dot(prevDir, dir), -1, 1));
+        turns++;
+      }
+      prevDir = dir;
+    }
+    const avg = hops ? hopSum / hops : 0;
+    const efficiency = clamp(Math.round((100 - (avg / UNIT) * 22) * 10) / 10, 0, 100);
+    const strain = turns ? clamp(Math.round((turn / turns) / Math.PI * 1000) / 10, 0, 100) : 0;
+    return { travel: travel, hops: hops, avgHop: avg, efficiency: efficiency, strain: strain };
+  }
+  function blochOf(nose) {
+    const theta = Math.acos(clamp(nose[2], -1, 1));
+    let phi = Math.atan2(nose[1], nose[0]);
+    if (phi < 0) phi += Math.PI * 2;
+    const ct = Math.cos(theta / 2);
+    const st = Math.sin(theta / 2);
+    return {
+      theta: theta,
+      phi: phi,
+      p0: ct * ct,
+      p1: st * st,
+      alpha: ct,
+      betaRe: st * Math.cos(phi),
+      betaIm: st * Math.sin(phi),
+      r: Math.hypot(nose[0], nose[1], nose[2])
+    };
+  }
+
+  const CAM = 5.2, FOCAL = 2.7, TILT = 0.58;
+  function toScreen(x, y, z, R) {
+    let X = y, Y = z, Z = x;
+    const ct = Math.cos(TILT), st = Math.sin(TILT);
+    const Y2 = Y * ct - Z * st;
+    const Z2 = Y * st + Z * ct;
+    const f = FOCAL / (CAM - Z2);
+    const fit = R / (1.42 * FOCAL / CAM);
+    return { x: X * f * fit, y: Y2 * f * fit, z: Z2 };
+  }
+  function ringPoints(kind, R) {
+    const pts = [];
+    for (let k = 0; k <= 72; k++) {
+      const a = (k / 72) * Math.PI * 2;
+      const c = Math.cos(a) * 1.42, s = Math.sin(a) * 1.42;
+      pts.push(kind === 'eq' ? toScreen(c, s, 0, R) : toScreen(0, c, s, R));
+    }
+    return pts;
+  }
+  function strokeRing(ctx, pts, front, style) {
+    ctx.lineWidth = style && style.width ? style.width : 1.2;
+    ctx.strokeStyle = style && style.color ? style.color : 'rgba(220,220,220,0.45)';
+    ctx.setLineDash(style && style.dash ? style.dash : []);
+    ctx.beginPath();
+    let on = false;
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k];
+      const show = front ? p.z > 0 : p.z <= 0;
+      if (!show) { on = false; continue; }
+      if (!on) { ctx.moveTo(p.x, -p.y); on = true; }
+      else ctx.lineTo(p.x, -p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function ring3(u, v, radius, R) {
+    const pts = [];
+    for (let k = 0; k <= 64; k++) {
+      const t = (k / 64) * Math.PI * 2;
+      const c = Math.cos(t) * radius, s = Math.sin(t) * radius;
+      pts.push(toScreen(u[0] * c + v[0] * s, u[1] * c + v[1] * s, u[2] * c + v[2] * s, R));
+    }
+    return pts;
+  }
+  function strokeBasis(ctx, basis, radius, R, front, style) {
+    strokeRing(ctx, ring3(basis.y, basis.z, radius, R), front, style);
+    strokeRing(ctx, ring3(basis.x, basis.z, radius, R), front, style);
+  }
+  function drawArc(ctx, cx, cy, R, frac) {
+    const sweep = 248 * Math.PI / 180;
+    const start = 142 * Math.PI / 180;
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = Math.max(9, R * 0.078);
+    ctx.strokeStyle = '#2c2c2c';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.90, start, start + sweep);
+    ctx.stroke();
+    ctx.strokeStyle = '#f4f4f4';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.90, start, start + sweep * Math.max(0, Math.min(1, frac)));
+    ctx.stroke();
+  }
+  function strokeTrail(ctx, pts, R, scale, style) {
+    ctx.lineWidth = style && style.width ? style.width : 1.25;
+    ctx.strokeStyle = style && style.color ? style.color : 'rgba(255,255,255,0.55)';
+    ctx.setLineDash(style && style.dash ? style.dash : []);
+    ctx.beginPath();
+    let prev = null;
+    let prevS = null;
+    let pen = false;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const s = toScreen(p[0] * scale, p[1] * scale, p[2] * scale, R);
+      let cut = false;
+      if (prev) {
+        const hop = Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]);
+        const jump = Math.hypot(s.x - prevS.x, s.y - prevS.y);
+        // A short arc that leaps across the disk is the back of the sphere folding.
+        if (hop < 0.28 && jump > R * 0.50) cut = true;
+      }
+      if (!pen || cut) ctx.moveTo(s.x, -s.y);
+      else ctx.lineTo(s.x, -s.y);
+      pen = true;
+      prev = p;
+      prevS = s;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function drawSphere(ctx, sx, cy, R, nose, trail, nextNose, wordPts) {
+    ctx.save();
+    ctx.translate(sx, cy);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.lineWidth = 1.35;
+    ctx.strokeStyle = 'rgba(255,255,255,0.40)';
+    ctx.stroke();
+    const eq = ringPoints('eq', R);
+    const mer = ringPoints('mer', R);
+    const dim = { color: 'rgba(255,255,255,0.10)', width: 1 };
+    const l2s = { color: 'rgba(255,255,255,0.55)', width: 1.15 };
+    const l3s = { color: 'rgba(255,255,255,0.42)', width: 1, dash: [2, 4] };
+    if (parts.l3 && layerView) strokeBasis(ctx, layerView.b3, 0.96, R, false, l3s);
+    if (parts.l2 && layerView) strokeBasis(ctx, layerView.b2, 1.12, R, false, l2s);
+    if (parts.l1 && layerView) strokeBasis(ctx, layerView.b1, 1.30, R, false, { color: 'rgba(244,244,244,0.8)', width: 1.25 });
+    if (parts.rings) {
+      strokeRing(ctx, eq, false, dim);
+      strokeRing(ctx, mer, false, dim);
+    }
+    if (parts.shadow) {
+      const sh = toScreen(nose[0] * 1.05, nose[1] * 1.05, 0, R);
+      const tip = toScreen(nose[0] * 1.05, nose[1] * 1.05, nose[2] * 1.05, R);
+      ctx.beginPath();
+      ctx.setLineDash([3, 4]);
+      ctx.moveTo(tip.x, -tip.y);
+      ctx.lineTo(sh.x, -sh.y);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(sh.x, -sh.y, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fill();
+    }
+    if (parts.trail && trail.length > 1) {
+      strokeTrail(ctx, trail, R, 1.05, { width: 1.25, color: 'rgba(255,255,255,0.55)' });
+    }
+    if (wordPts && wordPts.length > 1) {
+      strokeTrail(ctx, wordPts, R, 1.02, { width: 1.35, color: 'rgba(255,255,255,0.88)' });
+    }
+    if (parts.horizon && nextNose) {
+      const h = toScreen(nextNose[0] * 1.05, nextNose[1] * 1.05, nextNose[2] * 1.05, R);
+      ctx.beginPath();
+      ctx.arc(h.x, -h.y, 6.5, 0, Math.PI * 2);
+      ctx.lineWidth = 1.15;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.stroke();
+    }
+    if (parts.l3 && layerView && layerView.path.length > 1) {
+      strokeTrail(ctx, layerView.path, R, 1.05, { width: 1.2, color: 'rgba(255,255,255,0.75)', dash: [3, 3] });
+      const end = layerView.landNose;
+      const lp = toScreen(end[0] * 1.05, end[1] * 1.05, end[2] * 1.05, R);
+      ctx.beginPath();
+      ctx.arc(lp.x, -lp.y, 3.4, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.stroke();
+    }
+    if (parts.l2 && layerView && Number(layerView.lagDeg) > 4) {
+      const n2 = layerView.b2.x;
+      const tip2 = toScreen(n2[0] * 1.02, n2[1] * 1.02, n2[2] * 1.02, R);
+      const origin = toScreen(0, 0, 0, R);
+      ctx.beginPath();
+      ctx.moveTo(origin.x, -origin.y);
+      ctx.lineTo(tip2.x, -tip2.y);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.stroke();
+    }
+    if (parts.nose) {
+      const tip = toScreen(nose[0] * 1.05, nose[1] * 1.05, nose[2] * 1.05, R);
+      const origin = toScreen(0, 0, 0, R);
+      ctx.beginPath();
+      ctx.moveTo(origin.x, -origin.y);
+      ctx.lineTo(tip.x, -tip.y);
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#f4f4f4';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(tip.x, -tip.y, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#f7f7f7';
+      ctx.fill();
+    }
+    if (parts.l1 && layerView) strokeBasis(ctx, layerView.b1, 1.30, R, true, { color: 'rgba(244,244,244,0.9)', width: 1.25 });
+    if (parts.l2 && layerView) strokeBasis(ctx, layerView.b2, 1.12, R, true, l2s);
+    if (parts.l3 && layerView) strokeBasis(ctx, layerView.b3, 0.96, R, true, l3s);
+    if (parts.rings) {
+      strokeRing(ctx, eq, true, dim);
+      strokeRing(ctx, mer, true, dim);
+    }
+    ctx.restore();
+  }
+  function drawGaugeArc(canvas, cursorT) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const left = 2, right = w - 2, top = 6, bot = h - 6;
+    ctx.beginPath();
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.moveTo(left, bot);
+    ctx.lineTo(right, bot);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.strokeStyle = '#f2f2f2';
+    ctx.lineWidth = 1.35;
+    let pen = false;
+    let prevMode = null;
+    for (let k = 0; k <= 90; k++) {
+      const s = eventAt((k / 90) * LOOP);
+      if (prevMode && prevMode !== s.mode) pen = false;
+      prevMode = s.mode;
+      const max = s.mode === 'df' ? 5000 : 3;
+      const x = left + (right - left) * (s.t / LOOP);
+      const y = bot - (bot - top) * clamp(s.v / max, 0, 1);
+      if (!pen) { ctx.moveTo(x, y); pen = true; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    const x = left + (right - left) * clamp(cursorT, 0, 1);
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bot);
+    ctx.stroke();
+  }
+  function drawSparks(canvas) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    if (!bloch) return;
+    const series = [
+      [bloch.sparks.pitch, '#f4f4f4'],
+      [bloch.sparks.df, '#8d8d8d']
+    ];
+    series.forEach((row) => {
+      const s = row[0];
+      if (!s || s.length < 2) return;
+      let lo = Infinity, hi = -Infinity;
+      s.forEach((v) => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
+      const span = hi - lo || 1;
+      ctx.beginPath();
+      ctx.strokeStyle = row[1];
+      ctx.lineWidth = 1.25;
+      s.forEach((v, i) => {
+        const x = 2 + (i / (s.length - 1)) * (w - 4);
+        const y = h - 4 - ((v - lo) / span) * (h - 8);
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    });
+  }
+  const KEY_ROWS = ['qwertyuiop', 'asdfghjkl;', 'zxcvbnm,./'];
+  const FLOW_POS = { ' ': { x: 4.5, y: 3.2 } };
+  KEY_ROWS.forEach((row, r) => {
+    for (let c = 0; c < row.length; c++) FLOW_POS[row[c]] = { x: c + r * 0.25, y: r };
+  });
+  const HOME_SET = new Set('asdfghjkl;'.split(''));
+  const FINGER = {};
+  function assignFinger(chars, i) {
+    for (let k = 0; k < chars.length; k++) FINGER[chars[k]] = i;
+  }
+  assignFinger('qaz', 0);
+  assignFinger('wsx', 1);
+  assignFinger('edc', 2);
+  assignFinger('rfvtgb', 3);
+  assignFinger('yhnujm', 4);
+  assignFinger('ik,', 5);
+  assignFinger('ol.', 6);
+  assignFinger('p;/', 7);
+  const FLOW_GLYPH = { U: '↑', D: '↓', L: '←', R: '→', UL: '↖', UR: '↗', DL: '↙', DR: '↘', S: '●' };
+  function flowDir(dx, dy) {
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    if (adx < 0.3 && ady < 0.3) return 'S';
+    if (ady < 0.3) return dx > 0 ? 'R' : 'L';
+    if (adx < 0.3) return dy < 0 ? 'U' : 'D';
+    if (dy < 0) return dx > 0 ? 'UR' : 'UL';
+    return dx > 0 ? 'DR' : 'DL';
+  }
+  function solveWord(raw) {
+    const chars = String(raw || '').toLowerCase().slice(0, 64).split('').filter((c) => FLOW_POS[c] || /[a-z]/.test(c));
+    let totalDist = 0, rowChanges = 0, homeRowCount = 0, sameFinger = 0, handAlt = 0;
+    let prevFinger = null, prevHand = null, lastPos = null;
+    const hops = [];
+    chars.forEach((ch, i) => {
+      const pos = FLOW_POS[ch];
+      const fi = FINGER[ch];
+      const hand = fi === undefined ? '?' : fi <= 3 ? 'L' : 'R';
+      if (HOME_SET.has(ch)) homeRowCount++;
+      if (i > 0 && pos && lastPos) {
+        const dx = pos.x - lastPos.x;
+        const dy = pos.y - lastPos.y;
+        const dist = Math.hypot(dx, dy);
+        totalDist += dist;
+        const row = Math.abs(dy) > 0.3;
+        if (row) rowChanges++;
+        if (prevFinger !== null && fi === prevFinger && fi !== undefined) sameFinger++;
+        if (prevHand && hand !== '?' && prevHand !== '?' && prevHand !== hand) handAlt++;
+        const dir = flowDir(dx, dy);
+        hops.push({ a: chars[i - 1], b: ch, dir: dir, glyph: FLOW_GLYPH[dir] || dir, dist: dist, row: row });
+      }
+      lastPos = pos || lastPos;
+      prevFinger = fi !== undefined ? fi : prevFinger;
+      prevHand = hand !== '?' ? hand : prevHand;
+    });
+    const len = Math.max(chars.length, 1);
+    const transitions = Math.max(chars.length - 1, 1);
+    const avgDist = chars.length > 1 ? totalDist / transitions : 0;
+    const efficiency = chars.length > 1 ? clamp(Math.round((100 - avgDist * 22) * 10) / 10, 0, 100) : 100;
+    const strain = chars.length > 1 ? Math.min(100, Math.round((sameFinger * 18 + (1 - homeRowCount / len) * 35 + (rowChanges / transitions) * 30) * 10) / 10) : 0;
+    const travelMM = Math.round(avgDist * (chars.length > 1 ? transitions : 0) * 19 * 10) / 10;
+    const knots = [];
+    chars.forEach((ch) => {
+      const p = FLOW_POS[ch];
+      if (!p) return;
+      const yaw = (p.x / 10.25 - 0.5) * Math.PI * 1.15;
+      const pitch = (0.45 - p.y / 2.4) * 0.9;
+      knots.push(noseFrom(pitch, yaw));
+    });
+    const pts = [];
+    knots.forEach((knot, i) => {
+      if (!i) { pts.push(knot); return; }
+      for (let k = 1; k <= 8; k++) pts.push(slerp(knots[i - 1], knot, k / 8));
+    });
+    return {
+      chars: chars, hops: hops, pts: pts,
+      efficiency: efficiency, strain: strain, avgDist: avgDist,
+      travel: chars.length > 1 ? totalDist : 0, travelMM: travelMM,
+      rowChanges: rowChanges, sameFinger: sameFinger, handAlt: handAlt,
+      homeRowPct: Math.round((homeRowCount / len) * 1000) / 10
+    };
+  }
+  let wordSolve = solveWord(wordInput.value);
+  function keyCenter(ch, w, h) {
+    const p = FLOW_POS[ch];
+    const keyW = (w - 16) / 11.2;
+    const keyH = (h - 20) / 3.6;
+    const x = 8 + (p.x) * keyW;
+    const y = 8 + p.y * (keyH + 8);
+    return { x: x, y: y, keyW: keyW, keyH: keyH };
+  }
+  function drawKeys(canvas, solved) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const used = {};
+    solved.chars.forEach((ch) => { used[ch] = true; });
+    const keyW = (w - 16) / 11.2;
+    const keyH = (h - 20) / 3.6;
+    ctx.font = '500 18px "Avenir Next", "Helvetica Neue", Helvetica, sans-serif';
+    ctx.textBaseline = 'middle';
+    KEY_ROWS.forEach((row, r) => {
+      for (let c = 0; c < row.length; c++) {
+        const k = row[c];
+        const x = 8 + (c + r * 0.25) * keyW;
+        const y = 8 + r * (keyH + 8);
+        ctx.strokeStyle = used[k] ? '#f4f4f4' : '#2a2a2a';
+        ctx.lineWidth = used[k] ? 1.4 : 1;
+        ctx.strokeRect(x, y, keyW * 0.88, keyH);
+        ctx.fillStyle = used[k] ? '#f4f4f4' : '#6a6a6a';
+        ctx.fillText(k, x + 8, y + keyH * 0.5);
+      }
+    });
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1.6;
+    solved.chars.forEach((ch, i) => {
+      const p = FLOW_POS[ch];
+      if (!p) return;
+      const box = keyCenter(ch, w, h);
+      const x = box.x + keyW * 0.44;
+      const y = box.y + keyH * 0.5;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  }
+  function wordCubePoint(ch) {
+    const p = FLOW_POS[ch];
+    if (!p) return null;
+    return [(p.x / 10.25) * 1.35 - 0.68, 0.62 - (p.y / 2) * 1.15, 0.62];
+  }
+  function drawMiniCube(canvas, nose, solved) {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const R = Math.min(w, h) * 0.46;
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.stroke();
+    const s = 0.72;
+    const corners = [];
+    for (let x = -1; x <= 1; x += 2) {
+      for (let y = -1; y <= 1; y += 2) {
+        for (let z = -1; z <= 1; z += 2) corners.push(toScreen(x * s, y * s, z * s, R));
+      }
+    }
+    const edges = [[0,1],[0,2],[0,4],[3,1],[3,2],[3,7],[5,1],[5,4],[5,7],[6,2],[6,4],[6,7]];
+    ctx.beginPath();
+    ctx.lineWidth = 1.05;
+    ctx.strokeStyle = 'rgba(230,230,230,0.8)';
+    edges.forEach((e) => {
+      ctx.moveTo(corners[e[0]].x, -corners[e[0]].y);
+      ctx.lineTo(corners[e[1]].x, -corners[e[1]].y);
+    });
+    ctx.stroke();
+    const tip = toScreen(nose[0] * s, nose[1] * s, nose[2] * s, R);
+    const origin = toScreen(0, 0, 0, R);
+    ctx.beginPath();
+    ctx.moveTo(origin.x, -origin.y);
+    ctx.lineTo(tip.x, -tip.y);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tip.x, -tip.y, 3.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    if (solved && solved.chars && solved.chars.length > 1) {
+      ctx.beginPath();
+      ctx.lineWidth = 1.35;
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      let started = false;
+      solved.chars.forEach((ch) => {
+        const p = wordCubePoint(ch);
+        if (!p) return;
+        const s = toScreen(p[0], p[1], p[2], R);
+        if (!started) { ctx.moveTo(s.x, -s.y); started = true; }
+        else ctx.lineTo(s.x, -s.y);
+      });
+      ctx.stroke();
+      solved.chars.forEach((ch) => {
+        const p = wordCubePoint(ch);
+        if (!p) return;
+        const s = toScreen(p[0], p[1], p[2], R);
+        ctx.beginPath();
+        ctx.arc(s.x, -s.y, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = '#f4f4f4';
+        ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+  function qText(msg) {
+    if (!msg || !msg.qubits || !msg.qubits[0]) return '—';
+    const q = msg.qubits[0];
+    const who = msg.source ? ' ' + msg.source : '';
+    return d1(q.theta) + '° ' + d1(q.phi) + '°' + who;
+  }
+  function paintDock(viewNose, rawTrail) {
+    const ev = eventAt(held / 1000);
+    const keys = upcoming(ev.t);
+    el.evVal.textContent = (ev.mode === 'df' ? 'DOWNFORCE ' : 'G-FORCE ') + fmtVal(ev.mode, ev.v) + ' · ' + ev.t.toFixed(1) + ' s';
+    el.evPose.textContent = 'pitch ' + d1(ev.pitch) + '° · yaw ' + d1(ev.yaw) + '° · roll ' + d1(ev.roll) + '°';
+    el.evNext.textContent = keys.map((k) => {
+      const wrap = k.t <= ev.t + 0.04;
+      return (wrap ? 'loop ' : '') + k.t + 's ' + fmtVal(k.mode, k.v);
+    }).join(' · ');
+    el.evNote.textContent = setName === 'event'
+      ? 'Next recorded keys. The ring is that next nose.'
+      : 'Next recorded keys. The gauge is on the selected set.';
+    drawGaugeArc(document.getElementById('ev-wave'), ev.t / LOOP);
+
+    if (!bloch) {
+      el.blState.textContent = 'estimator missing';
+      el.blQ.textContent = '';
+    } else {
+      const g = bloch.gyro;
+      el.blState.textContent = 'θ ' + d1(bloch.theta) + '° · φ ' + d1(bloch.phi) + '° · |r| ' + Math.hypot(bloch.rx, bloch.ry, bloch.rz).toFixed(2)
+        + ' · residual ' + (bloch.residual * 180 / Math.PI).toFixed(2) + '°';
+      el.blAmp.textContent = 'p0 ' + bloch.p0.toFixed(3) + ' · p1 ' + bloch.p1.toFixed(3)
+        + ' · α ' + bloch.alpha.toFixed(3)
+        + ' · β ' + bloch.betaRe.toFixed(3) + (bloch.betaIm >= 0 ? ' + ' : ' − ') + Math.abs(bloch.betaIm).toFixed(3) + ' i'
+        + ' · ' + Math.round(bloch.downforce) + ' kg · alt ' + bloch.alt.toFixed(1) + ' ft';
+      el.blImu.textContent = 'gyro ' + (g ? g.wx.toFixed(3) + '  ' + g.wy.toFixed(3) + '  ' + g.wz.toFixed(3) : '—')
+        + ' · anchor ' + d1(bloch.anchorAng) + '°'
+        + ' · chord ' + ((bloch.noseRate || 0) * 0.5).toFixed(3);
+      const q = bloch.q || [];
+      el.blQ.textContent = q.length === 4
+        ? ('q ' + q[0].toFixed(3) + '  ' + q[1].toFixed(3) + '  ' + q[2].toFixed(3) + '  ' + q[3].toFixed(3)
+          + ' · r ' + bloch.rx.toFixed(2) + '  ' + bloch.ry.toFixed(2) + '  ' + bloch.rz.toFixed(2))
+        : '';
+      const log = bloch.log && bloch.log[0];
+      el.blLog.textContent = 'N ' + bloch.posN.toFixed(1) + ' E ' + bloch.posE.toFixed(1)
+        + (log ? (' · log ' + log.t.toFixed(1) + 's · pitch ' + log.pitch.toFixed(1) + '° · θ ' + log.theta.toFixed(1) + '° · ' + Math.round(log.df) + ' kg · ' + log.alt.toFixed(1) + ' ft') : '');
+    }
+    el.blBus.textContent = 'posted ' + qText(posted) + ' · heard ' + qText(echo)
+      + (inbound ? ' · in ' + (inbound.source || 'foreign') + ' ' + qText(inbound) : '');
+    drawSparks(document.getElementById('bl-spark'));
+
+    const v1n = noseFrom(deg(V1.pitch), 0);
+    const range = Math.acos(clamp(dot(viewNose, v1n), -1, 1));
+    el.v1Main.textContent = 'pitch ' + V1.pitch + '° · roll ' + V1.roll + '° · ' + V1.downforceKg + ' kg · ' + V1.altitudeFt + ' ft';
+    el.v1Range.textContent = 'range to v1 nose ' + d1(range) + '°';
+    el.v1Ch.textContent = V1_CHANNELS;
+
+    const m = trailMetrics(rawTrail);
+    el.pathMain.textContent = 'travel ' + m.travel.toFixed(3) + ' · hops ' + m.hops + ' · avg ' + m.avgHop.toFixed(3);
+    el.pathEff.textContent = 'efficiency ' + m.efficiency.toFixed(1) + ' · strain ' + m.strain.toFixed(1);
+    el.pathSh.textContent = 'equator shadow ' + Math.hypot(viewNose[0], viewNose[1]).toFixed(2);
+    el.pathNote.textContent = layerView
+      ? ('L2 lag ' + layerView.lagDeg + '° · L3 rebound ' + layerView.rebDeg + '° · land ' + layerView.landDeg + '°')
+      : 'Short-hop score, unit 0.05. Strain is turning.';
+    const w = wordSolve;
+    el.pathWord.textContent = w && w.chars.length
+      ? (w.chars.join('') + ' · ' + w.chars.length + ' keys · hop ' + w.travel.toFixed(2)
+        + ' · ' + w.travelMM.toFixed(0) + ' mm · eff ' + w.efficiency.toFixed(1)
+        + ' · strain ' + w.strain.toFixed(1))
+      : 'type a word in Codex';
+    drawMiniCube(document.getElementById('cube-cv'), viewNose, w);
+    paintCodex(viewNose);
+  }
+  function paintCodex(viewNose) {
+    const w = wordSolve;
+    if (!w) return;
+    const flow = w.hops.map((h) => h.glyph).join(' ');
+    el.codexMet.textContent = w.chars.length
+      ? (w.chars.length + ' keys · travel ' + w.travel.toFixed(2) + ' u · ' + w.travelMM.toFixed(1) + ' mm'
+        + ' · avg ' + w.avgDist.toFixed(2)
+        + ' · efficiency ' + w.efficiency.toFixed(1)
+        + ' · strain ' + w.strain.toFixed(1)
+        + ' · home ' + w.homeRowPct.toFixed(0) + '%'
+        + ' · rows ' + w.rowChanges
+        + ' · same-finger ' + w.sameFinger
+        + ' · hands ' + w.handAlt)
+      : 'Type a word. One QWERTY.';
+    el.codexFlow.textContent = flow || '—';
+    el.flowList.textContent = w.hops.length
+      ? w.hops.map((h) => h.a + h.b + '  ' + h.glyph + '  ' + h.dir + '  ' + h.dist.toFixed(2) + (h.row ? '  row' : '')).join('\n')
+      : 'A word of one letter has no hop.';
+    drawKeys(document.getElementById('kb'), w);
+    drawMiniCube(document.getElementById('codex-cube'), viewNose, w);
+  }
+  function publish(nose) {
+    const now = performance.now();
+    if (now - lastPost < 100 && posted) return;
+    lastPost = now;
+    const b = blochOf(nose);
+    posted = {
+      type: 'bloch-state',
+      source: 'roadster-bloch',
+      qubits: [{ theta: b.theta, phi: b.phi, label: 'q0' }],
+      dual: { particle: { theta: b.theta, phi: b.phi, rx: nose[0], ry: nose[1], rz: nose[2] } },
+      timestamp: Date.now()
+    };
+    try { if (bus) bus.postMessage(posted); } catch (e) { /* channel closed */ }
+  }
+
+  function bandHeight() {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--plate');
+    const n = parseFloat(raw);
+    return n > 40 ? n : 168;
+  }
+  function drawStage(ctx, y, w, h, pose, viewNose, viewTrail, nextNose, wordPts) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y, w, h);
+    ctx.clip();
+    let R = Math.min(w * 0.34, h * 0.36);
+    if (R * 4.85 > w * 0.96) R = (w * 0.96) / 4.85;
+    const gap = R * 0.85;
+    const gx = w / 2 - gap / 2 - R;
+    const sx = w / 2 + gap / 2 + R;
+    const cy = y + h * 0.50;
+    const max = pose.mode === 'df' ? 5000 : 3;
+    drawArc(ctx, gx, cy, R, pose.v / max);
+    ctx.fillStyle = '#f5f5f5';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const font = '"Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.font = '500 ' + Math.round(R * 0.105) + 'px ' + font;
+    ctx.fillText(pose.mode === 'df' ? 'DOWNFORCE' : 'G-FORCE', gx, cy - R * 0.26);
+    ctx.font = '300 ' + Math.round(R * 0.44) + 'px ' + font;
+    ctx.fillText(pose.mode === 'df' ? String(Math.round(pose.v)) : pose.v.toFixed(1), gx, cy + R * 0.05);
+    ctx.font = '400 ' + Math.round(R * 0.095) + 'px ' + font;
+    ctx.fillStyle = '#cfcfcf';
+    ctx.fillText(pose.mode === 'df' ? 'KG' : 'G', gx, cy + R * 0.30);
+    drawSphere(ctx, sx, cy, R, viewNose, viewTrail, nextNose, wordPts);
+    ctx.restore();
+  }
+  function drawPlate(ctx, y, w, h, pose, viewNose, viewTrail, wordPts) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y, w, h);
+    ctx.clip();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, y, w, h);
+    ctx.strokeStyle = '#242424';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(w, y + 0.5);
+    ctx.stroke();
+    const R = Math.max(34, Math.min(h * 0.36, 72));
+    const sx = Math.round(14 + R);
+    const cy = Math.round(y + h * 0.54);
+    drawSphere(ctx, sx, cy, R, viewNose, viewTrail, null, wordPts);
+    const font = '"Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif';
+    const x = sx + R + 20;
+    const rows = [
+      ['PITCH', ((pose.pitch + camPitch) * 180 / Math.PI).toFixed(1) + '°'],
+      ['YAW', ((pose.yaw + camYaw) * 180 / Math.PI).toFixed(1) + '°'],
+      ['ROLL', (pose.roll * 180 / Math.PI).toFixed(1) + '°']
+    ];
+    if (pose.alt != null) rows.push(['ALT', pose.alt.toFixed(1) + ' ft']);
+    rows.push([pose.mode === 'df' ? 'FORCE' : 'G', pose.mode === 'df' ? Math.round(pose.v) + ' kg' : pose.v.toFixed(1) + ' g']);
+    const lv = layerView;
+    const nxt = upcoming(held / 1000)[0];
+    const nextText = nxt ? (nxt.t + 's ' + (nxt.mode === 'df' ? Math.round(nxt.v) : nxt.v.toFixed(1))) : '—';
+    const cast = lv ? [
+      ['θ', (lv.theta * 180 / Math.PI).toFixed(1) + '°'],
+      ['φ', (lv.phi * 180 / Math.PI).toFixed(1) + '°'],
+      ['RESID', bloch ? ((bloch.residual * 180 / Math.PI).toFixed(2) + '°') : '—'],
+      ['NEXT', nextText],
+      ['L2', lv.lagDeg + '°'],
+      ['L3', lv.rebDeg + '°'],
+      ['LAND', lv.landDeg + '°']
+    ] : [];
+    const more = lv ? [
+      ['SHADOW', lv.shadow.toFixed(2)],
+      ['RANGE', (lv.range * 180 / Math.PI).toFixed(1) + '°'],
+      ['P0', lv.p0.toFixed(3)],
+      ['P1', lv.p1.toFixed(3)],
+      ['RATE', (lv.wPitch * 180 / Math.PI).toFixed(0) + ' ' + (lv.wYaw * 180 / Math.PI).toFixed(0)]
+    ] : [];
+    if (lv && bloch && bloch.gyro) {
+      more.push(['GYRO', bloch.gyro.wx.toFixed(2) + ' ' + bloch.gyro.wy.toFixed(2) + ' ' + bloch.gyro.wz.toFixed(2)]);
+    }
+    if (bloch && bloch.q && bloch.q.length === 4) {
+      more.push(['Q', bloch.q.map((v) => v.toFixed(2)).join(' ')]);
+    }
+    const groups = [{ head: pose.source === 'bloch' ? 'BLOCH' : pose.source === 'v1' ? 'V1' : 'EVENT', rows: rows, valueAt: 72, valueSize: 15, span: 156 }];
+    if (cast.length) groups.push({ head: 'CAST', rows: cast, valueAt: 52, valueSize: 13, span: 148 });
+    if (more.length) groups.push({ head: 'MODEL', rows: more, valueAt: 58, valueSize: 13, span: 168 });
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    let cursor = x;
+    groups.forEach((g) => {
+      if (cursor + 96 > w) return;
+      const rowH = Math.min(22, (h - 28) / g.rows.length);
+      let yy = cy - ((g.rows.length - 1) * rowH) / 2;
+      ctx.font = '500 10px ' + font;
+      ctx.fillStyle = '#8d8d8d';
+      ctx.fillText(g.head, cursor, yy - rowH);
+      g.rows.forEach((row) => {
+        ctx.fillStyle = '#7d7d7d';
+        ctx.font = '500 10px ' + font;
+        ctx.fillText(row[0], cursor, yy);
+        ctx.fillStyle = '#f4f4f4';
+        ctx.font = '300 ' + g.valueSize + 'px ' + font;
+        ctx.fillText(row[1], cursor + g.valueAt, yy);
+        yy += rowH;
+      });
+      cursor += g.span;
+    });
+    ctx.restore();
+  }
+
+  function frame(now) {
+    syncPlate();
+    if (plateOn && now < nextPlatePaint) {
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (plateOn) nextPlatePaint = now + 33;
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+    last = now;
+    if (!paused) {
+      held = now - t0;
+      ensureBloch();
+      if (bloch) window.RoadsterBloch.step(bloch, dt || 1 / 60);
+    }
+    const pose = sample();
+    const reqPitch = pose.pitch + camPitch;
+    const reqYaw = pose.yaw + camYaw;
+    const keysNow = upcoming(pose.t);
+    const nextKey = setName === 'event' && keysNow.length ? keysNow[0] : null;
+    stepLayers(dt, reqPitch, reqYaw, pose.roll, nextKey);
+    const viewNose = noseFrom(reqPitch, reqYaw);
+    const rawTrail = shownTrail();
+    const viewTrail = rawTrail.map(orbit);
+    const nextNose = nextKey ? orbit(noseFrom(deg(nextKey.pitch), deg(nextKey.yaw))) : null;
+    wordSolve = solveWord(wordInput.value);
+    const showWord = !plateOn && board.classList.contains('open') && wordSolve.pts.length > 1;
+    const viewWord = showWord ? wordSolve.pts.map(orbit) : null;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+
+    const dockH = plateOn ? 0 : document.getElementById('dock').getBoundingClientRect().height;
+    const barH = plateOn ? 0 : Math.ceil(document.getElementById('bar').getBoundingClientRect().height);
+    const boardOpen = !plateOn && board.classList.contains('open');
+    const boardW = boardOpen ? Math.ceil(board.getBoundingClientRect().right) + 8 : 0;
+    hint.style.left = boardW ? (boardW + 8) + 'px' : '16px';
+    const plateH = Math.min(bandHeight(), Math.max(120, h - dockH - barH - 40));
+    const plateY = h - dockH - plateH;
+    ctx.save();
+    ctx.translate(boardW, 0);
+    drawStage(ctx, barH, Math.max(240, w - boardW), Math.max(40, plateY - barH), pose, viewNose, viewTrail, nextNose, viewWord);
+    ctx.restore();
+    drawPlate(ctx, plateY, w, plateH, pose, viewNose, viewTrail, viewWord);
+    if (!plateOn) paintDock(viewNose, rawTrail);
+    publish(viewNose);
+    requestAnimationFrame(frame);
+  }
+
+  function mark() {
+    document.querySelectorAll('[data-set]').forEach((b) => b.classList.toggle('on', b.dataset.set === setName));
+    document.querySelectorAll('[data-menu]').forEach((b) => b.classList.toggle('on', b.dataset.menu === menuName));
+    const name = setName === 'event' ? 'event pass' : setName === 'bloch' ? 'bloch estimator' : 'v1 still';
+    hint.textContent = name + ' is L1 · L2 counters · L3 lands · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
+  }
+  function openBoard(name) {
+    const open = name === 'codex' || name === 'cube' || name === 'flow';
+    board.classList.toggle('open', open);
+    if (!open) return;
+    const id = name === 'cube' ? 'codex-cube' : name === 'flow' ? 'flow-head' : 'word';
+    const node = document.getElementById(id);
+    if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+  }
+  document.getElementById('bar').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.id === 'sources') return;
+    if (b.dataset.menu) {
+      menuName = b.dataset.menu;
+      if (menuName === 'sphere') {
+        setName = 'event';
+        t0 = performance.now() - held;
+      } else if (menuName === 'bloch') {
+        setName = 'bloch';
+        ensureBloch();
+      } else if (menuName === 'path') {
+        parts.trail = true;
+        const trailBtn = document.querySelector('[data-part="trail"]');
+        if (trailBtn) trailBtn.classList.add('on');
+      }
+      openBoard(menuName);
+    }
+    if (b.dataset.set) {
+      setName = b.dataset.set;
+      if (setName === 'bloch') {
+        ensureBloch();
+        if (menuName === 'sphere') menuName = 'bloch';
+      }
+      if (setName === 'event') t0 = performance.now() - held;
+      if (setName !== 'bloch' && menuName === 'bloch') menuName = 'sphere';
+    }
+    if (b.dataset.part) {
+      parts[b.dataset.part] = !parts[b.dataset.part];
+      b.classList.toggle('on', parts[b.dataset.part]);
+    }
+    mark();
+  });
+  document.getElementById('sources').addEventListener('click', () => sheet.classList.toggle('open'));
+
+  sheet.innerHTML = '<p class="lead">The dock computes the slices that read this sample. FlexGlue, splats, Unitree, EMG, BCI, and the MPC playground stay on their own pages.</p>'
+    + SOURCES.map((group) => {
+      const items = group[1].map((row) => {
+        return '<li><a href="' + row[1] + '">' + row[0] + '</a> — ' + row[2] + '</li>';
+      }).join('');
+      return '<h2>' + group[0] + '</h2><ul>' + items + '</ul>';
+    }).join('');
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.target.tagName === 'INPUT') return;
+    e.preventDefault();
+    paused = !paused;
+    if (!paused) t0 = performance.now() - held;
+    mark();
+  });
+  cv.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, yaw: camYaw, pitch: camPitch, t: performance.now() };
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const now = performance.now();
+    const dt = Math.max(0.016, (now - drag.t) / 1000);
+    const ny = drag.yaw + (e.clientX - drag.x) * 0.005;
+    const np = clamp(drag.pitch + (drag.y - e.clientY) * 0.004, -1.1, 1.1);
+    shell.dragYaw = clamp((ny - camYaw) / dt, -8, 8);
+    shell.dragPitch = clamp((np - camPitch) / dt, -8, 8);
+    camYaw = ny;
+    camPitch = np;
+    drag.t = now;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    drag.yaw = camYaw;
+    drag.pitch = camPitch;
+  });
+  cv.addEventListener('pointerup', () => { drag = null; });
+
+  try {
+    bus = new BroadcastChannel('bloch-state');
+    ear = new BroadcastChannel('bloch-state');
+    ear.onmessage = (ev) => {
+      const m = ev.data;
+      if (!m || m.type !== 'bloch-state') return;
+      if (m.source === 'roadster-bloch') echo = m;
+      else inbound = m;
+    };
+  } catch (e) { /* file pages can refuse the channel */ }
+
+  ensureBloch();
+  const bt = Number(params.get('bt')) || 0;
+  if (bt > 0 && bloch) {
+    const n = Math.min(3600, Math.round(bt * 60));
+    for (let i = 0; i < n; i++) window.RoadsterBloch.step(bloch, 1 / 60);
+  }
+  if (params.has('sources')) sheet.classList.add('open');
+  if (menuName === 'path') parts.trail = true;
+  openBoard(menuName);
+  syncPlate();
+  el.v1Ch.textContent = V1_CHANNELS;
+  mark();
+  frame(performance.now());
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "id": "v1",
+  "pitchDeg": 106,
+  "rollDeg": 0,
+  "downforceKg": 4706,
+  "altitudeFt": 51.4,
+  "note": "Still from the v1 attitude sphere. Altitude 51.4 ft is the sensor note, not a frame from the recording.",
+  "channels": [
+    { "name": "Pitch / attitude", "sense": "6-DoF IMU" },
+    { "name": "Downforce", "sense": "Pressure times area, or the fan model. Four fans, skirts." },
+    { "name": "Altitude", "sense": "Baro plus GPS, laser, radar, and IMU. The mix lags." },
+    { "name": "Tank pressure", "sense": "Supporting. Example noted at 5500 PSI." },
+    { "name": "Wheel speed", "sense": "Supporting." },
+    { "name": "Suspension", "sense": "Supporting." }
+  ]
+}
