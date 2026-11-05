@@ -9,21 +9,42 @@
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #eee;
     font: 13px/1.35 "Avenir Next", "Helvetica Neue", Helvetica, sans-serif; }
   canvas#cv { display: block; width: 100%; height: 100%; touch-action: none; }
-  #bar {
+  #head {
     position: fixed; z-index: 3; top: 0; left: 0; right: 0;
+    background: #000;
+    border-bottom: 1px solid #161616;
+  }
+  #bar {
     display: flex; flex-wrap: nowrap; gap: 0; align-items: center;
     padding: 0 52px 0 12px;
     background: #000;
-    border-bottom: 1px solid #161616;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
+    scrollbar-width: none;
   }
+  #bar::-webkit-scrollbar { display: none; }
   #bar .brand {
     color: #f5f5f5; letter-spacing: 0.2em; font-size: 11px; font-weight: 500;
     margin-right: 8px; flex: 0 0 auto;
   }
   #bar button {
     flex: 0 0 auto; min-height: 44px; padding: 0 14px;
+  }
+  #ticker {
+    height: 22px; margin-right: 44px; overflow: hidden;
+    border-top: 1px solid #161616;
+    color: #9a9a9a; font-size: 12px; letter-spacing: 0.14em;
+    white-space: nowrap; pointer-events: none; user-select: none;
+  }
+  body.sources-open #ticker { margin-right: calc(var(--drawer) + 44px); }
+  #ticker-track {
+    display: flex; width: max-content;
+    animation: ticker 28s linear infinite;
+  }
+  #ticker-track span { padding-right: 64px; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    #ticker-track { animation: none; }
   }
   button {
     background: transparent; color: #8d8d8d; border: 0; font: inherit;
@@ -135,7 +156,7 @@
   }
   #board {
     position: fixed; z-index: 4; display: none;
-    top: 46px; left: 12px; width: min(420px, 46vw);
+    top: 72px; left: 12px; width: min(420px, 46vw);
     bottom: calc(var(--dock) + var(--plate) + 12px);
     overflow: auto; background: #070707; border: 1px solid #2a2a2a;
     padding: 8px 14px 18px; box-sizing: border-box;
@@ -160,7 +181,8 @@
     #dock { grid-template-columns: 1fr 1fr; height: var(--dock); overflow: auto; }
   }
   body.plate { --dock: 0px; }
-  body.plate #bar,
+  body.plate #bar { padding-right: 12px; }
+  body.plate #ticker { margin-right: 0; }
   body.plate #hint,
   body.plate #dock,
   body.plate #sheet,
@@ -170,6 +192,7 @@
 </style>
 </head>
 <body>
+<div id="head">
 <div id="bar">
   <span class="brand">SPHERE</span>
   <button type="button" data-menu="live">Live</button>
@@ -183,8 +206,16 @@
   <button type="button" data-menu="track">Track</button>
   <button type="button" data-menu="map">Map</button>
   <button type="button" data-menu="waves">Waves</button>
+  <button type="button" data-menu="limb">Limb</button>
   <button type="button" data-action="tether">Tether</button>
   <button type="button" data-action="sources" id="sources">Sources</button>
+</div>
+<div id="ticker">
+  <div id="ticker-track">
+    <span id="tick-a"></span>
+    <span id="tick-b" aria-hidden="true"></span>
+  </div>
+</div>
 </div>
 <nav id="edge" aria-label="Menu">
   <button type="button" data-menu="live">Live</button>
@@ -198,6 +229,7 @@
   <button type="button" data-menu="track">Track</button>
   <button type="button" data-menu="map">Map</button>
   <button type="button" data-menu="waves">Waves</button>
+  <button type="button" data-menu="limb">Limb</button>
   <button type="button" data-action="tether">Tether</button>
   <button type="button" data-action="sources">Sources</button>
 </nav>
@@ -267,6 +299,8 @@
     </div>
   </div>
 </aside>
+<script src="data/muscle-skeleton.js"></script>
+<script src="js/muscle-skeleton.js"></script>
 <script src="js/roadster-bloch.js"></script>
 <script>
 (function () {
@@ -301,7 +335,15 @@
     ['This page', [
       ['Event pass', 'data/roadster-event-pass.json', '38s gauge and nose, read from the recording. The dock replays these keys'],
       ['Bloch estimator', 'js/roadster-bloch.js', 'Pitch anchored at 106°. Plant plus Mahony. The dock returns θ, φ, sparks, and residual'],
-      ['v1 sensors', 'data/roadster-v1-sensors.json', 'Still. Pitch 106°, 4706 kg, altitude 51.4 ft']
+      ['v1 sensors', 'data/roadster-v1-sensors.json', 'Still. Pitch 106°, 4706 kg, altitude 51.4 ft'],
+      ['Limb record', 'data/muscle-skeleton.json', 'Figure 7 loop, MA–MF cells, and the Manfrotto frame. The limb view reads this file'],
+      ['Leg figures', 'data/muscle-leg/wiley/aisy70537-fig-0001-m.jpg', 'Wiley JPEGs and the muscle-leg stills. The strip draws them']
+    ]],
+    ['Printed leg', [
+      ['Paper', 'https://doi.org/10.1002/aisy.70537', 'Yoshimura, Kawaharazuka, Okada. Advanced Intelligent Systems 2026, e70537. The limb view plays Figure 7. The paper does not run here'],
+      ['Project site', 'https://ssk-yoshimura.github.io/muscle-leg/', 'The stills in the strip. The site does not run here'],
+      ['Data repo', 'https://github.com/ssk-yoshimura/flexible-pattern-musculoskeletal', 'params.xlsx and the experiment CSVs. The raw cycles stay in that repo'],
+      ['Manfrotto grip', 'https://www.manfrotto.com/global-en/lighting/stands-arms-clamps/', 'Catalog skeleton. Payloads are grip ratings. The legs carry the frame']
     ]],
     ['Composer', [
       ['composer', 'https://github.com/fornevercollective/composer', 'Offline OpenQASM workpad. Amplitudes below use the same θ, φ map'],
@@ -402,7 +444,7 @@
   let setName = params.get('set') || 'event';
   if (setName !== 'bloch' && setName !== 'v1') setName = 'event';
   let menuName = params.get('menu') || (setName === 'bloch' ? 'bloch' : 'sphere');
-  if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether', 'track', 'map', 'waves'].indexOf(menuName) < 0) menuName = 'sphere';
+  if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether', 'track', 'map', 'waves', 'limb'].indexOf(menuName) < 0) menuName = 'sphere';
   if (!params.get('set') && menuName === 'bloch') setName = 'bloch';
   if (!params.get('set') && menuName === 'live') setName = 'event';
   if (params.get('word')) wordInput.value = params.get('word').slice(0, 64);
@@ -1432,11 +1474,14 @@
     }
     if (!hopLive || hopLive.mbpsDown == null) return '';
     const down = Math.round(hopLive.mbpsDown);
-    const up = hopLive.mbpsUp == null ? '' : ' · ' + (Math.round(hopLive.mbpsUp * 10) / 10) + ' up';
+    const up = hopLive.mbpsUp == null ? '' : ' · ' + (Math.round(hopLive.mbpsUp * 10) / 10).toFixed(1) + ' up';
     return ' · speed ' + down + ' Mbps' + up
       + ' · Wi-Fi ' + (hopLive.wifi || 0)
       + ' · AirDrop ' + (hopLive.airdrop || 0)
       + ' · Cell ' + (hopLive.cellHeard || 0);
+  }
+  function hopSpeedLine() {
+    return hopSpeedNote().replace(/^ · /, '');
   }
   function stampHopLinks() {
     if (!hopLive || hopLive.mbpsDown == null) return;
@@ -1448,7 +1493,56 @@
       a.setAttribute('href', base + '?' + q);
     });
   }
+  const DOCK_TITLES = ['EVENT PASS', 'BLOCH RETURN', 'V1 SENSORS', 'PATH · NOSE CUBE'];
+  function setDockTitles(titles) {
+    const heads = document.querySelectorAll('#dock section h2');
+    for (let i = 0; i < heads.length && i < titles.length; i++) heads[i].textContent = titles[i];
+  }
+  function clearMuscleColors() {
+    [el.blState, el.blAmp, el.blImu, el.blQ, el.blBus, el.blLog].forEach(function (p) {
+      if (p) p.style.color = '';
+    });
+  }
+  function paintLimbDock() {
+    const view = window.MuscleSkeleton;
+    const d = view.dock(held / 1000);
+    setDockTitles(d.titles);
+    el.evVal.textContent = d.clock[0];
+    el.evPose.textContent = d.clock[1];
+    el.evNext.textContent = d.clock[2];
+    el.evNote.textContent = d.clock[3];
+    const slots = [el.blState, el.blAmp, el.blImu, el.blQ, el.blBus, el.blLog];
+    for (let i = 0; i < slots.length; i++) {
+      const row = d.muscles[i];
+      slots[i].textContent = row ? row.text : '';
+      slots[i].style.color = row ? row.color : '';
+    }
+    el.v1Main.textContent = d.mechanics[0];
+    el.v1Range.textContent = d.mechanics[1];
+    el.v1Ch.textContent = d.mechanics[2];
+    el.pathMain.textContent = d.frame[0];
+    el.pathEff.textContent = d.frame[1];
+    el.pathSh.textContent = d.frame[2];
+    el.pathNote.textContent = d.frame[3];
+    el.pathWord.textContent = '';
+    el.pathSync.textContent = '';
+    const spark = document.getElementById('bl-spark');
+    const cube = document.getElementById('cube-cv');
+    if (spark) spark.style.display = 'none';
+    if (cube) cube.style.display = 'none';
+    view.drawTimeline(document.getElementById('ev-wave'), held / 1000);
+  }
   function paintDock(viewNose, rawTrail) {
+    if (!plateOn && menuName === 'limb' && window.MuscleSkeleton) {
+      paintLimbDock();
+      return;
+    }
+    setDockTitles(DOCK_TITLES);
+    clearMuscleColors();
+    const spark = document.getElementById('bl-spark');
+    const cube = document.getElementById('cube-cv');
+    if (spark) spark.style.display = '';
+    if (cube) cube.style.display = '';
     const ev = eventAt(held / 1000);
     const keys = upcoming(ev.t);
     el.evVal.textContent = (ev.mode === 'df' ? 'DOWNFORCE ' : 'G-FORCE ') + fmtVal(ev.mode, ev.v) + ' · ' + ev.t.toFixed(1) + ' s';
@@ -1591,6 +1685,14 @@
         peak: round3(mapView.peak),
         angle: deg1(mapView.angle)
       } : null,
+      speed: hopLive && hopLive.mbpsDown != null ? {
+        down: Math.round(hopLive.mbpsDown),
+        up: hopLive.mbpsUp == null ? null : Math.round(hopLive.mbpsUp * 10) / 10,
+        wifi: hopLive.wifi || 0,
+        airdrop: hopLive.airdrop || 0,
+        cell: hopLive.cellHeard || 0,
+        line: hopSpeedLine()
+      } : null,
       timestamp: Date.now()
     };
     window.SphereTether.latest = coords;
@@ -1724,6 +1826,19 @@
     return n > 40 ? n : 168;
   }
   function drawStage(ctx, y, w, h, pose, viewNose, viewTrail, nextNose, wordPts) {
+    if (!plateOn && menuName === 'limb' && window.MuscleSkeleton) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, y, w, h);
+      ctx.clip();
+      window.MuscleSkeleton.draw(ctx, {
+        x: 0, y: y, w: w, h: h,
+        yaw: camYaw, pitch: camPitch,
+        t: held / 1000
+      });
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, y, w, h);
@@ -2389,6 +2504,37 @@
     ctx.restore();
   }
 
+  let tickLine = '';
+  let tickHops = '';
+  function paintTicker(solved, pose) {
+    const hops = solved.hops.length
+      ? solved.hops.map(function (h) { return h.a + h.glyph + h.b; }).join('  ')
+      : (solved.chars.join('') || '—');
+    const pitch = Math.round(pose.pitch * 180 / Math.PI);
+    const yaw = Math.round(pose.yaw * 180 / Math.PI);
+    const speed = hopSpeedLine();
+    const line = (speed ? speed + '   ·   ' : '') + hops + '   ·   p ' + pitch + '°   y ' + yaw + '°   ' + fmtVal(pose.mode, pose.v);
+    if (line === tickLine) return;
+    tickLine = line;
+    const a = document.getElementById('tick-a');
+    const b = document.getElementById('tick-b');
+    if (a) a.textContent = line;
+    if (b) b.textContent = line;
+    if (hops !== tickHops) {
+      tickHops = hops;
+      const track = document.getElementById('ticker-track');
+      if (track) {
+        const sec = Math.max(16, Math.min(48, Math.round(hops.length * 0.55)));
+        track.style.animationDuration = sec + 's';
+      }
+    }
+    const box = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sphere;
+    if (box && document.hasFocus()) {
+      try { box.postMessage({ flow: line, word: solved.chars.join('') }); }
+      catch (err) { /* the plate bridge is optional */ }
+    }
+  }
+
   function frame(now) {
     syncPlate();
     if (plateOn && now < nextPlatePaint) {
@@ -2422,6 +2568,7 @@
     const viewTrail = rawTrail.map(orbit);
     const nextNose = nextKey ? orbit(noseFrom(deg(nextKey.pitch), deg(nextKey.yaw))) : null;
     wordSolve = solveWord(wordInput.value);
+    paintTicker(wordSolve, pose);
     const showWord = !plateOn && board.classList.contains('open') && wordSolve.pts.length > 1;
     const viewWord = showWord ? wordSolve.pts.map(orbit) : null;
 
@@ -2437,7 +2584,9 @@
     ctx.fillRect(0, 0, w, h);
 
     const dockH = plateOn ? 0 : document.getElementById('dock').getBoundingClientRect().height;
-    const barH = plateOn ? 0 : Math.ceil(document.getElementById('bar').getBoundingClientRect().height);
+    const headEl = document.getElementById('head');
+    let barH = Math.ceil(headEl.getBoundingClientRect().height);
+    if (barH < 40) barH = 66;
     const boardOpen = !plateOn && board.classList.contains('open');
     const boardW = boardOpen ? Math.ceil(board.getBoundingClientRect().right) + 8 : 0;
     const edgeEl = document.getElementById('edge');
@@ -2448,7 +2597,8 @@
     hint.style.left = boardW ? (boardW + 8) + 'px' : '16px';
     const trackH = (!plateOn && menuName === 'track') ? 136 : 0;
     const mapH = (!plateOn && menuName === 'map') ? 148 : 0;
-    const stripH = trackH || mapH;
+    const limbH = (!plateOn && menuName === 'limb') ? 92 : 0;
+    const stripH = trackH || mapH || limbH;
     hint.style.bottom = stripH
       ? 'calc(var(--dock) + var(--plate) + ' + (stripH + 6) + 'px)'
       : '';
@@ -2461,6 +2611,11 @@
     ctx.restore();
     if (trackH) drawTrack(ctx, boardW + 8, plateY - trackH, stageW - 16, trackH - 6);
     if (mapH) drawMap(ctx, boardW + 8, plateY - mapH, stageW - 16, mapH - 6);
+    if (limbH && window.MuscleSkeleton) {
+      window.MuscleSkeleton.drawStrip(ctx, {
+        x: boardW + 8, y: plateY - limbH, w: stageW - 16, h: limbH - 6
+      }, held / 1000);
+    }
     drawPlate(ctx, plateY, Math.max(240, w - rightW), plateH, pose, viewNose, viewTrail, viewWord);
     if (!plateOn) paintDock(viewNose, rawTrail);
     publish(viewNose);
@@ -2470,6 +2625,9 @@
       hint.textContent = why
         ? ('refused · ' + why + (paused ? ' · paused' : ''))
         : ('256 sites on this sphere · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses'));
+    } else if (menuName === 'limb' && window.MuscleSkeleton) {
+      const d = window.MuscleSkeleton.dock(held / 1000);
+      hint.textContent = d.clock[0] + (paused ? ' · paused' : ' · drag orbits · space pauses');
     }
     requestAnimationFrame(frame);
   }
@@ -2488,6 +2646,8 @@
         : ('256 sites on this sphere · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses'));
     } else if (menuName === 'waves') {
       hint.textContent = 'gauge series on the ring · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
+    } else if (menuName === 'limb') {
+      hint.textContent = 'Figure 7 on the grip frame · ' + (paused ? 'paused · space runs' : 'drag orbits · space pauses');
     } else {
       hint.textContent = name + ' is L1 · L2 counters · L3 lands · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
     }
@@ -2551,7 +2711,8 @@
       ['rays', 'Rays', 'Force, counter, bend, travel'],
       ['track', 'Track', 'Head and hands from the camera'],
       ['map', 'Map', 'Sites, chain, and detector on this sample'],
-      ['waves', 'Waves', 'Gauge series around a ring']
+      ['waves', 'Waves', 'Gauge series around a ring'],
+      ['limb', 'Limb', 'Printed leg, muscles, and the grip frame']
     ];
     const sets = [
       ['event', 'Event', 'Recording keys'],
@@ -2655,17 +2816,53 @@
     }
   });
 
+  const KEY_GO = {
+    Digit1: 'live', Digit2: 'sphere', Digit3: 'bloch', Digit4: 'path',
+    Digit5: 'codex', Digit6: 'cube', Digit7: 'flow', Digit8: 'rays',
+    Digit9: 'track', Digit0: 'map', KeyW: 'waves', KeyL: 'limb', KeyT: 'tether', KeyS: 'sources'
+  };
+  function go(name) {
+    if (name === 'pause') {
+      paused = !paused;
+      if (!paused) t0 = performance.now() - held;
+      mark();
+      return;
+    }
+    if (name === 'sources') {
+      setSources(!sheet.classList.contains('open'));
+      return;
+    }
+    if (name === 'tether') {
+      menuName = 'tether';
+      openBoard('tether');
+      setSources(true);
+      const sec = document.getElementById('tether-sec');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' });
+      mark();
+      return;
+    }
+    if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether', 'track', 'map', 'waves', 'limb'].indexOf(name) < 0) return;
+    applyMenu(name);
+    mark();
+  }
+  window.SphereKeys = { go: go };
   window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === 'Escape') {
       setSources(false);
       return;
     }
-    if (e.code !== 'Space') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      go('pause');
+      return;
+    }
+    const name = KEY_GO[e.code];
+    if (!name) return;
     e.preventDefault();
-    paused = !paused;
-    if (!paused) t0 = performance.now() - held;
-    mark();
+    go(name);
   });
   cv.addEventListener('pointerdown', (e) => {
     drag = { x: e.clientX, y: e.clientY, yaw: camYaw, pitch: camPitch, t: performance.now() };
