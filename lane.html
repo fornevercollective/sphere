@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lane · hop speed</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #eee;
+    font: 13px/1.4 "Avenir Next", "Helvetica Neue", Helvetica, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 14px 18px 8px;
+    border-bottom: 1px solid #161616; background: #000; }
+  header b { font-weight: 500; letter-spacing: 0.16em; font-size: 11px; }
+  header span { color: #9a9a9a; }
+  a { color: #f2f2f2; }
+  main { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100% - 48px); }
+  canvas { width: 220px; height: 220px; display: block; }
+  #radios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 18px; }
+  section { border: 1px solid #1c1c1c; padding: 12px 14px; background: #000; }
+  h2 { margin: 0 0 6px; font-size: 10px; letter-spacing: 0.16em; font-weight: 500; color: #8a8a8a; }
+  strong { display: block; font-size: 28px; font-weight: 300; }
+  p { margin: 6px 0 0; color: #cfcfcf; }
+  #hops { padding: 0 18px 24px; }
+  #hops li { margin: 8px 0; color: #dedede; }
+  .dim { color: #7d7d7d; }
+</style>
+</head>
+<body>
+<header>
+  <b>HOP</b>
+  <span id="speed">speed —</span>
+  <a href="https://code.ugrad.ai/">code.ugrad.ai</a>
+  <a href="https://map.ugrad.ai/">map.ugrad.ai</a>
+  <a href="https://map.ugrad.ai/lane-line-tree">lane-line-tree</a>
+</header>
+<main>
+  <canvas id="cv" width="440" height="440"></canvas>
+  <div>
+    <div id="radios">
+      <section><h2>WI-FI</h2><strong id="wifi">—</strong><p>House LAN and heard Wi-Fi.</p></section>
+      <section><h2>AIRDROP</h2><strong id="drop">—</strong><p>Peers advertising AirDrop.</p></section>
+      <section><h2>CELL</h2><strong id="cell">—</strong><p>Heard on a cellular radio. This Mac has no modem.</p></section>
+    </div>
+    <ol id="hops"></ol>
+  </div>
+</main>
+<script>
+(function () {
+  const speed = document.getElementById('speed');
+  const hops = document.getElementById('hops');
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let hop = null;
+  let yaw = 0;
+
+  function draw() {
+    const w = cv.width, h = cv.height;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    const cx = w * 0.5, cy = h * 0.52, R = w * 0.36;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, R, R * 0.28, 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    const ang = yaw;
+    const tipX = cx + Math.cos(ang) * R * 0.72;
+    const tipY = cy - Math.sin(ang) * R * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tipX, tipY);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    yaw += 0.01;
+  }
+
+  let nextDraw = 0;
+  function tick(now) {
+    if (now >= nextDraw) {
+      nextDraw = now + 33;
+      draw();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function paint() {
+    if (!hop) return;
+    const down = Math.round(hop.mbpsDown || 0);
+    const up = hop.mbpsUp == null ? '' : ' · ' + (Math.round(hop.mbpsUp * 10) / 10) + ' up';
+    speed.textContent = 'speed ' + down + ' Mbps' + up;
+    document.getElementById('wifi').textContent = hop.wifi || 0;
+    document.getElementById('drop').textContent = hop.airdrop || 0;
+    document.getElementById('cell').textContent = hop.cellHeard || 0;
+    const lanes = [
+      ['Wi-Fi', 'house LAN', down],
+      ['AirDrop', 'heard peers', down],
+      ['Cell', 'heard radios', hop.cellHeard ? down : 0]
+    ];
+    hops.innerHTML = lanes.map(function (row) {
+      return '<li>' + row[0] + ' <span class="dim">' + row[1] + '</span> · ' + row[2] + ' Mbps</li>';
+    }).join('')
+      + '<li class="dim">Share speed from Network Bubble. code.ugrad.ai, map.ugrad.ai, and lane-line-tree open with ?mbps=' + down + '.</li>';
+    const q = 'mbps=' + down;
+    document.querySelectorAll('header a').forEach(function (a) {
+      const base = a.getAttribute('href').split('?')[0];
+      a.setAttribute('href', base + '?' + q);
+    });
+  }
+
+  function load() {
+    fetch('hop.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      hop = j;
+      paint();
+    }).catch(function () {});
+  }
+  load();
+  setInterval(load, 15000);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
