@@ -4,9 +4,29 @@
 // GET /coords returns the last fix for a device that only polls.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { networkInterfaces } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const PORT = 9741;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8'
+};
+
+function pageFile(url) {
+  let rel = decodeURIComponent((url || '/').split('?')[0]);
+  if (rel === '/' || rel === '') rel = 'index.html';
+  else rel = rel.replace(/^\/+/, '');
+  if (!rel || rel.includes('..') || rel.includes('\\') || rel.includes('\0')) return null;
+  if (rel !== 'index.html' && !rel.startsWith('js/') && !rel.startsWith('data/')) return null;
+  const abs = path.resolve(ROOT, rel);
+  if (abs !== ROOT && !abs.startsWith(ROOT + path.sep)) return null;
+  return abs;
+}
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 let last = null;
 const clients = new Set();
@@ -70,8 +90,17 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(last || { type: 'sphere-coords', v: 1, t: null }));
     return;
   }
+  const file = pageFile(req.url);
+  if (file && TYPES[path.extname(file)]) {
+    fs.readFile(file, (err, buf) => {
+      if (err) { res.statusCode = 404; res.end(); return; }
+      res.setHeader('Content-Type', TYPES[path.extname(file)]);
+      res.end(buf);
+    });
+    return;
+  }
   res.setHeader('Content-Type', 'text/plain');
-  res.end('sphere tether\nws /sphere\nGET /coords\n');
+  res.end('sphere tether\nhttp://127.0.0.1:' + PORT + '/\nws /sphere\nGET /coords\n');
 });
 
 server.on('upgrade', (req, socket) => {
@@ -96,6 +125,7 @@ server.listen(PORT, '0.0.0.0', () => {
     });
   });
   for (const host of addrs) {
+    process.stdout.write('sphere page http://' + host + ':' + PORT + '/\n');
     process.stdout.write('sphere tether ws://' + host + ':' + PORT + '/sphere\n');
   }
 });

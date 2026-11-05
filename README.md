@@ -8,7 +8,9 @@ Open `index.html` in a browser.
 - [KBatch](https://kbatch.ugrad.ai) is the path geometry. The codex uses its short-hop rule on one QWERTY: efficiency is 100 minus average key distance times 22.
 - [Qbit Globe](https://mueee.qbitos.ai/qbit-globe.html) is the letter wheel. This page links to it.
 
-Sources opens a right drawer. The menu is a vertical edge rail — Live, Sphere, Bloch, Path, Codex, Cube, Flow, Rays, Tether, Sources — with 44px targets. SET, PART, LAYER, and the Zen, KBatch, and Globe links live in that drawer.
+Sources opens a right drawer. The menu is a vertical edge rail — Live, Sphere, Bloch, Path, Codex, Cube, Flow, Rays, Track, Tether, Sources — with 44px targets. SET, PART, LAYER, and the Zen, KBatch, and Globe links live in that drawer.
+
+Track opens the camera. A wire head and two wire hands sit in the same black frame. Head yaw and pitch steer the orbit. The gauge stays the recording. The face and hand models load only then. `node tether/server.mjs` also serves this folder at `http://127.0.0.1:9741/` for a browser that blocks the camera on a file page.
 
 `?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word. `?sources=1` opens the drawer.
 

@@ -129,6 +129,10 @@
   }
   #sheet .lead { color: #9a9a9a; margin: 10px 0 0; }
   #tether-read { color: #cfcfcf; white-space: pre-wrap; font-size: 12px; }
+  #track-cam {
+    position: fixed; left: 0; top: 0; width: 2px; height: 2px;
+    opacity: 0; pointer-events: none;
+  }
   #board {
     position: fixed; z-index: 4; display: none;
     top: 46px; left: 12px; width: min(420px, 46vw);
@@ -176,6 +180,7 @@
   <button type="button" data-menu="cube">Cube</button>
   <button type="button" data-menu="flow">Flow</button>
   <button type="button" data-menu="rays">Rays</button>
+  <button type="button" data-menu="track">Track</button>
   <button type="button" data-action="tether">Tether</button>
   <button type="button" data-action="sources" id="sources">Sources</button>
 </div>
@@ -188,6 +193,7 @@
   <button type="button" data-menu="cube">Cube</button>
   <button type="button" data-menu="flow">Flow</button>
   <button type="button" data-menu="rays">Rays</button>
+  <button type="button" data-menu="track">Track</button>
   <button type="button" data-action="tether">Tether</button>
   <button type="button" data-action="sources">Sources</button>
 </nav>
@@ -200,6 +206,7 @@
   <div class="drw-body" id="sheet-body"></div>
 </aside>
 <canvas id="cv"></canvas>
+<video id="track-cam" playsinline muted></video>
 <div id="hint">event pass drives the gauge · space pauses</div>
 <footer id="dock">
   <section>
@@ -326,6 +333,10 @@
       ['Sionna RT', 'https://github.com/NVlabs/sionna-rt', 'A path is vertices plus an interaction: line of sight, specular, diffraction. The rays below use that shape on this sample. The solver does not run here'],
       ['Tether', 'ws://127.0.0.1:9741/sphere', 'Live coordinates. BroadcastChannel sphere-coords, and that socket when node tether/server.mjs is up. GET /coords is the last fix']
     ]],
+    ['Track', [
+      ['Face Landmarker', 'https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker', 'Head yaw, pitch, and roll. Loaded only when Track is on'],
+      ['Hand Landmarker', 'https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker', 'Two hands. The wires are this camera, not the recording']
+    ]],
     ['Vision', [
       ['vision-demos', 'https://github.com/jeremyipark/vision-demos', 'Demos. Not run here'],
       ['FlexGlue', 'https://github.com/cvg/FlexGlue', 'CVG. Not run here'],
@@ -372,7 +383,7 @@
   let setName = params.get('set') || 'event';
   if (setName !== 'bloch' && setName !== 'v1') setName = 'event';
   let menuName = params.get('menu') || (setName === 'bloch' ? 'bloch' : 'sphere');
-  if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether'].indexOf(menuName) < 0) menuName = 'sphere';
+  if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether', 'track'].indexOf(menuName) < 0) menuName = 'sphere';
   if (!params.get('set') && menuName === 'bloch') setName = 'bloch';
   if (!params.get('set') && menuName === 'live') setName = 'event';
   if (params.get('word')) wordInput.value = params.get('word').slice(0, 64);
@@ -1423,6 +1434,17 @@
       l1: Object.assign({ pitch: deg1(pose.pitch + camPitch), yaw: deg1(pose.yaw + camYaw), roll: deg1(pose.roll) }, vec3(viewNose), { proj: projectOf(viewNose) }),
       l2: Object.assign({ pitch: deg1(shell.pitch), yaw: deg1(shell.yaw), lag: lv ? Number(lv.lagDeg) : 0 }, vec3(l2n), { proj: projectOf(l2n) }),
       l3: Object.assign({ pitch: deg1(lv ? lv.landPitch : 0), yaw: deg1(lv ? lv.landYaw : 0) }, vec3(l3n), { proj: projectOf(l3n) }),
+      head: track.head ? {
+        yaw: deg1(track.head.yaw),
+        pitch: deg1(track.head.pitch),
+        roll: deg1(track.head.roll)
+      } : null,
+      hands: track.hands.map((h) => ({
+        side: h.side,
+        x: round3(h.x),
+        y: round3(h.y),
+        pinch: round3(h.pinch)
+      })),
       timestamp: Date.now()
     };
     window.SphereTether.latest = coords;
@@ -1448,6 +1470,14 @@
         + '  L1 ' + p.pitch.toFixed(1) + '° ' + p.yaw.toFixed(1) + '°'
         + '\nL2 ' + coords.l2.pitch.toFixed(1) + '° ' + coords.l2.yaw.toFixed(1) + '°'
         + '  L3 ' + coords.l3.pitch.toFixed(1) + '° ' + coords.l3.yaw.toFixed(1) + '°';
+      if (coords.head) {
+        read.textContent += '\nhead ' + coords.head.yaw.toFixed(0)
+          + ' ' + coords.head.pitch.toFixed(0)
+          + ' ' + coords.head.roll.toFixed(0);
+      }
+      if (coords.hands.length) {
+        read.textContent += '\nhands ' + coords.hands.map((h) => h.side + ' ' + h.pinch.toFixed(2)).join('  ');
+      }
     }
   }
   function connectTether() {
@@ -1589,6 +1619,350 @@
     ctx.restore();
   }
 
+  const TRACK_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
+  const TRACK_FACE = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+  const TRACK_HAND = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+  const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+  const FACE_EYE_A = [33, 160, 158, 133, 153, 144];
+  const FACE_EYE_B = [263, 387, 385, 362, 380, 373];
+  const FACE_LIPS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
+  const FACE_NOSE = [10, 168, 1, 2];
+  const HAND_LINKS = [
+    [0, 1], [1, 2], [2, 3], [3, 4],
+    [0, 5], [5, 6], [6, 7], [7, 8],
+    [0, 9], [9, 10], [10, 11], [11, 12],
+    [0, 13], [13, 14], [14, 15], [15, 16],
+    [0, 17], [17, 18], [18, 19], [19, 20],
+    [5, 9], [9, 13], [13, 17]
+  ];
+  const track = {
+    want: false,
+    on: false,
+    starting: false,
+    status: 'off',
+    head: null,
+    hands: [],
+    faceLines: null,
+    video: null,
+    stream: null,
+    faceLm: null,
+    handLm: null,
+    lastDetect: 0,
+    lastStamp: 0
+  };
+
+  function mirLm(p) { return [1 - p.x, p.y]; }
+  function headFromLm(lm) {
+    if (!lm || !lm[1] || !lm[33] || !lm[263]) return null;
+    const a = mirLm(lm[33]);
+    const b = mirLm(lm[263]);
+    const n = mirLm(lm[1]);
+    const left = a[0] < b[0] ? a : b;
+    const right = a[0] < b[0] ? b : a;
+    const dist = Math.hypot(right[0] - left[0], right[1] - left[1]) || 1e-3;
+    const midX = (left[0] + right[0]) / 2;
+    const midY = (left[1] + right[1]) / 2;
+    return {
+      yaw: clamp((n[0] - midX) / dist * 2.2, -1.1, 1.1),
+      pitch: clamp(((midY - n[1]) / dist + 0.62) * 2.0, -0.9, 0.9),
+      roll: clamp(Math.atan2(right[1] - left[1], right[0] - left[0]), -0.8, 0.8)
+    };
+  }
+  function blendHead(next, dt) {
+    if (!next) return null;
+    const prev = track.head;
+    if (!prev) return next;
+    const k = 1 - Math.exp(-Math.max(0.016, dt) / 0.12);
+    return {
+      yaw: prev.yaw + (next.yaw - prev.yaw) * k,
+      pitch: prev.pitch + (next.pitch - prev.pitch) * k,
+      roll: prev.roll + (next.roll - prev.roll) * k
+    };
+  }
+  function faceLinesFrom(lm) {
+    const chain = (idx, close) => {
+      const pts = idx.map((i) => mirLm(lm[i]));
+      if (close && pts.length) pts.push(pts[0]);
+      return pts;
+    };
+    return [
+      chain(FACE_OVAL, true),
+      chain(FACE_EYE_A, true),
+      chain(FACE_EYE_B, true),
+      chain(FACE_LIPS, true),
+      chain(FACE_NOSE, false)
+    ];
+  }
+  function handsFrom(result) {
+    const lms = (result && (result.landmarks || result.handLandmarks)) || [];
+    const hands = lms.filter((lm) => lm && lm.length >= 21).slice(0, 2).map((lm) => {
+      const wrist = mirLm(lm[0]);
+      const mid = mirLm(lm[9]);
+      const thumb = mirLm(lm[4]);
+      const index = mirLm(lm[8]);
+      const palm = Math.hypot(mid[0] - wrist[0], mid[1] - wrist[1]) || 1e-3;
+      return {
+        side: wrist[0] < 0.5 ? 'L' : 'R',
+        x: wrist[0],
+        y: wrist[1],
+        pinch: Math.hypot(index[0] - thumb[0], index[1] - thumb[1]) / palm,
+        pts: lm.map(mirLm)
+      };
+    });
+    hands.sort((a, b) => a.x - b.x);
+    if (hands.length === 1) hands[0].side = hands[0].x < 0.5 ? 'L' : 'R';
+    if (hands.length === 2) {
+      hands[0].side = 'L';
+      hands[1].side = 'R';
+    }
+    return hands;
+  }
+  function pumpTrack(now) {
+    if (!track.on || !track.video || track.video.readyState < 2) return;
+    if (!track.faceLm || !track.handLm) return;
+    if (now - track.lastDetect < 33) return;
+    const stamp = Math.max(now, track.lastStamp + 1);
+    track.lastStamp = stamp;
+    track.lastDetect = now;
+    let face;
+    let hands;
+    try {
+      face = track.faceLm.detectForVideo(track.video, stamp);
+      hands = track.handLm.detectForVideo(track.video, stamp);
+    } catch (e) {
+      track.status = 'tracker missed a frame';
+      return;
+    }
+    const lm = face && face.faceLandmarks && face.faceLandmarks[0];
+    const dt = track.prevDetect ? Math.max(0.016, (now - track.prevDetect) / 1000) : 0.033;
+    track.prevDetect = now;
+    track.head = blendHead(headFromLm(lm), dt);
+    track.faceLines = lm ? faceLinesFrom(lm) : null;
+    track.hands = handsFrom(hands);
+    track.status = track.head ? 'live' : (track.hands.length ? 'hands only' : 'no face');
+  }
+  async function openLandmarkers() {
+    if (track.faceLm && track.handLm) return;
+    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm');
+    const files = await vision.FilesetResolver.forVisionTasks(TRACK_WASM);
+    async function make(Ctor, model, count) {
+      const opts = {
+        baseOptions: { modelAssetPath: model, delegate: 'GPU' },
+        runningMode: 'VIDEO'
+      };
+      Object.assign(opts, count);
+      try {
+        return await Ctor.createFromOptions(files, opts);
+      } catch (e) {
+        opts.baseOptions = { modelAssetPath: model, delegate: 'CPU' };
+        return Ctor.createFromOptions(files, opts);
+      }
+    }
+    track.faceLm = await make(vision.FaceLandmarker, TRACK_FACE, { numFaces: 1 });
+    if (!track.want) return;
+    track.handLm = await make(vision.HandLandmarker, TRACK_HAND, { numHands: 2 });
+  }
+  async function startTrack() {
+    if (track.starting || track.on) return;
+    track.want = true;
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      track.status = 'camera needs http://127.0.0.1:9741/';
+      return;
+    }
+    track.starting = true;
+    track.status = 'loading';
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+      } catch (e) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+      }
+      if (!track.want) {
+        stream.getTracks().forEach((t) => t.stop());
+        track.starting = false;
+        return;
+      }
+      const video = document.getElementById('track-cam');
+      video.srcObject = stream;
+      await video.play();
+      track.stream = stream;
+      track.video = video;
+      track.status = 'loading models';
+      await openLandmarkers();
+      if (!track.want) {
+        stopTrack();
+        return;
+      }
+      track.on = true;
+      track.status = 'live';
+    } catch (e) {
+      track.on = false;
+      track.status = (e && e.name === 'NotAllowedError') ? 'camera blocked' : 'camera unavailable';
+    }
+    track.starting = false;
+  }
+  function stopTrack() {
+    track.want = false;
+    track.on = false;
+    track.starting = false;
+    track.status = 'off';
+    track.head = null;
+    track.hands = [];
+    track.faceLines = null;
+    if (track.stream) track.stream.getTracks().forEach((t) => t.stop());
+    track.stream = null;
+    const video = document.getElementById('track-cam');
+    if (video) video.srcObject = null;
+    track.video = null;
+  }
+  function fitMap(pts, x, y, w, h) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pts.forEach((p) => {
+      minX = Math.min(minX, p[0]);
+      minY = Math.min(minY, p[1]);
+      maxX = Math.max(maxX, p[0]);
+      maxY = Math.max(maxY, p[1]);
+    });
+    const bw = Math.max(1e-3, maxX - minX);
+    const bh = Math.max(1e-3, maxY - minY);
+    const pad = 8;
+    const s = Math.min(Math.max(1, w - pad * 2) / bw, Math.max(1, h - pad * 2) / bh);
+    const ox = x + (w - bw * s) / 2 - minX * s;
+    const oy = y + (h - bh * s) / 2 - minY * s;
+    return (p) => [ox + p[0] * s, oy + p[1] * s];
+  }
+  function strokeChain(ctx, pts, map) {
+    if (!pts || pts.length < 2) return;
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const q = map(p);
+      if (i === 0) ctx.moveTo(q[0], q[1]);
+      else ctx.lineTo(q[0], q[1]);
+    });
+    ctx.stroke();
+  }
+  function drawHeadGuide(ctx, b) {
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    const rx = Math.min(b.w, b.h) * 0.28;
+    const ry = rx * 1.25;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx - rx * 0.45, cy - ry * 0.12);
+    ctx.lineTo(cx - rx * 0.12, cy - ry * 0.12);
+    ctx.moveTo(cx + rx * 0.12, cy - ry * 0.12);
+    ctx.lineTo(cx + rx * 0.45, cy - ry * 0.12);
+    ctx.moveTo(cx, cy - ry * 0.02);
+    ctx.lineTo(cx, cy + ry * 0.28);
+    ctx.stroke();
+  }
+  function drawHandGuide(ctx, b) {
+    const x = b.x + b.w * 0.5;
+    const y = b.y + b.h * 0.78;
+    const s = Math.min(b.w, b.h);
+    ctx.beginPath();
+    [[-0.28, -0.46], [-0.12, -0.58], [0.02, -0.62], [0.16, -0.54], [0.28, -0.38]].forEach((t) => {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + t[0] * s, y + t[1] * s);
+    });
+    ctx.stroke();
+  }
+  function drawTrack(ctx, x, y, w, h) {
+    const font = '"Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.strokeStyle = '#242424';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 0.5);
+    ctx.lineTo(x + w, y + 0.5);
+    ctx.stroke();
+    const labels = ['HEAD', 'LEFT', 'RIGHT'];
+    const cw = w / 3;
+    const liveHead = track.faceLines && track.head;
+    const bySide = { L: null, R: null };
+    track.hands.forEach((hand) => { bySide[hand.side] = hand; });
+    for (let i = 0; i < 3; i++) {
+      const cx = x + i * cw;
+      if (i) {
+        ctx.strokeStyle = '#242424';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + 0.5, y + 8);
+        ctx.lineTo(cx + 0.5, y + h - 8);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#8d8d8d';
+      ctx.font = '500 10px ' + font;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(labels[i], cx + 12, y + 8);
+      const box = { x: cx + 6, y: y + 24, w: cw - 12, h: Math.max(20, h - 52) };
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 1.25;
+      if (i === 0 && liveHead) {
+        const flat = [];
+        track.faceLines.forEach((line) => line.forEach((p) => flat.push(p)));
+        const map = fitMap(flat, box.x, box.y, box.w, box.h);
+        ctx.strokeStyle = '#f4f4f4';
+        track.faceLines.forEach((line) => strokeChain(ctx, line, map));
+      } else if (i > 0 && bySide[i === 1 ? 'L' : 'R']) {
+        const hand = bySide[i === 1 ? 'L' : 'R'];
+        const map = fitMap(hand.pts, box.x, box.y, box.w, box.h);
+        ctx.strokeStyle = '#f4f4f4';
+        HAND_LINKS.forEach((link) => strokeChain(ctx, [hand.pts[link[0]], hand.pts[link[1]]], map));
+        ctx.fillStyle = '#f4f4f4';
+        hand.pts.forEach((p) => {
+          const q = map(p);
+          ctx.fillRect(q[0] - 0.8, q[1] - 0.8, 1.6, 1.6);
+        });
+      } else {
+        ctx.strokeStyle = '#3a3a3a';
+        if (i === 0) drawHeadGuide(ctx, box);
+        else drawHandGuide(ctx, box);
+      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(cx + 8, y + h - 28, cw - 16, 22);
+      ctx.clip();
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+      if (i === 0 && track.head) {
+        ctx.fillStyle = '#f4f4f4';
+        ctx.font = '300 13px ' + font;
+        const hd = track.head;
+        ctx.fillText(
+          (hd.yaw * 180 / Math.PI).toFixed(0) + '°  '
+          + (hd.pitch * 180 / Math.PI).toFixed(0) + '°  '
+          + (hd.roll * 180 / Math.PI).toFixed(0) + '°',
+          cx + 12, y + h - 10
+        );
+      } else if (i > 0 && bySide[i === 1 ? 'L' : 'R']) {
+        const hand = bySide[i === 1 ? 'L' : 'R'];
+        ctx.fillStyle = '#f4f4f4';
+        ctx.font = '300 13px ' + font;
+        ctx.fillText('pinch ' + hand.pinch.toFixed(2), cx + 12, y + h - 10);
+      } else if (i === 0) {
+        ctx.fillStyle = '#9a9a9a';
+        ctx.font = '300 12px ' + font;
+        ctx.fillText(track.status, cx + 12, y + h - 10);
+      } else {
+        ctx.fillStyle = '#6a6a6a';
+        ctx.font = '300 13px ' + font;
+        ctx.fillText('—', cx + 12, y + h - 10);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   function frame(now) {
     syncPlate();
     if (plateOn && now < nextPlatePaint) {
@@ -1602,6 +1976,12 @@
       held = now - t0;
       ensureBloch();
       if (bloch) window.RoadsterBloch.step(bloch, dt || 1 / 60);
+    }
+    pumpTrack(now);
+    if (menuName === 'track' && track.head && !drag) {
+      const k = 1 - Math.exp(-(dt || 0.016) / 0.18);
+      camYaw += (clamp(track.head.yaw, -1.1, 1.1) - camYaw) * k;
+      camPitch += (clamp(track.head.pitch, -0.9, 0.9) - camPitch) * k;
     }
     const pose = sample();
     const reqPitch = pose.pitch + camPitch;
@@ -1638,12 +2018,18 @@
       ? Math.ceil(sheet.getBoundingClientRect().width) : 0;
     const rightW = edgeW + drawerW;
     hint.style.left = boardW ? (boardW + 8) + 'px' : '16px';
-    const plateH = Math.min(bandHeight(), Math.max(120, h - dockH - barH - 40));
+    const trackH = (!plateOn && menuName === 'track') ? 136 : 0;
+    hint.style.bottom = trackH
+      ? 'calc(var(--dock) + var(--plate) + ' + (trackH + 6) + 'px)'
+      : '';
+    const plateH = Math.min(bandHeight(), Math.max(120, h - dockH - barH - trackH - 40));
     const plateY = h - dockH - plateH;
+    const stageW = Math.max(240, w - boardW - rightW);
     ctx.save();
     ctx.translate(boardW, 0);
-    drawStage(ctx, barH, Math.max(240, w - boardW - rightW), Math.max(40, plateY - barH), pose, viewNose, viewTrail, nextNose, viewWord);
+    drawStage(ctx, barH, stageW, Math.max(40, plateY - barH - trackH), pose, viewNose, viewTrail, nextNose, viewWord);
     ctx.restore();
+    if (trackH) drawTrack(ctx, boardW + 8, plateY - trackH, stageW - 16, trackH - 6);
     drawPlate(ctx, plateY, Math.max(240, w - rightW), plateH, pose, viewNose, viewTrail, viewWord);
     if (!plateOn) paintDock(viewNose, rawTrail);
     publish(viewNose);
@@ -1656,7 +2042,11 @@
     document.querySelectorAll('[data-menu]').forEach((b) => b.classList.toggle('on', b.dataset.menu === menuName));
     document.querySelectorAll('[data-part]').forEach((b) => b.classList.toggle('on', !!parts[b.dataset.part]));
     const name = setName === 'event' ? 'event pass' : setName === 'bloch' ? 'bloch estimator' : 'v1 still';
-    hint.textContent = name + ' is L1 · L2 counters · L3 lands · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
+    if (menuName === 'track') {
+      hint.textContent = 'head steers the orbit · ' + track.status + (paused ? ' · paused' : '');
+    } else {
+      hint.textContent = name + ' is L1 · L2 counters · L3 lands · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
+    }
   }
   function openBoard(name) {
     const open = name === 'codex' || name === 'cube' || name === 'flow';
@@ -1671,6 +2061,7 @@
     document.body.classList.toggle('sources-open', open);
   }
   function applyMenu(name) {
+    if (name !== 'track') stopTrack();
     menuName = name;
     if (name === 'live') {
       setName = 'event';
@@ -1690,6 +2081,8 @@
       parts.l1 = true;
       parts.l2 = true;
       parts.l3 = true;
+    } else if (name === 'track') {
+      startTrack();
     }
     openBoard(name);
   }
@@ -1711,7 +2104,8 @@
       ['codex', 'Codex', 'One QWERTY word'],
       ['cube', 'Cube', 'Nose plus the word path'],
       ['flow', 'Flow', 'Bigram hops'],
-      ['rays', 'Rays', 'Force, counter, bend, travel']
+      ['rays', 'Rays', 'Force, counter, bend, travel'],
+      ['track', 'Track', 'Head and hands from the camera']
     ];
     const sets = [
       ['event', 'Event', 'Recording keys'],
@@ -1876,6 +2270,11 @@
     parts.l3 = true;
   }
   if (params.has('sources') || menuName === 'tether') setSources(true);
+  if (menuName === 'track') {
+    track.status = window.isSecureContext
+      ? 'tap Track to open the camera'
+      : 'camera needs http://127.0.0.1:9741/';
+  }
   openBoard(menuName);
   if (menuName === 'tether') {
     const sec = document.getElementById('tether-sec');
