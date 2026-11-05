@@ -16,6 +16,8 @@ Map draws 256 sites on this sphere from the same sample. The chain is sample, ra
 
 The stage adds a six-spoke direction gauge beside the force arc. Spoke length is how this sample aligns with 0°, 60°, 120°, 180°, 240°, and 300°. The solid polygon is the requested bearing. The dashed polygon is the counter. A tick marks the bearing. The shape follows the radar in [SSIO figure 1](https://ssio-imu.github.io/images/fig1_corrected_legend.png). [SSIO](https://ssio-imu.github.io) does not run in the page, and the arms are not that figure's velocity errors. `?plate=1` keeps the force arc and the sphere.
 
+Waves opens a ring of offset lines between the force arc and the sphere. The far rim rises with the gauge series. The near rim is dotted. Neighbor rings carry a shifted sine, which is the moiré. The form follows the black-and-white study for [Summoners HALO](https://gmunk.com/ORA-Summoners-HALO) and the line fields in [Mathographics](https://gmunk.com/Mathographics). Those projects do not run in the page.
+
 `?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word. `?sources=1` opens the drawer.
 
 Layer 1 is the requested attitude. Layer 2 counters the cleaned rate and slews with drag. Layer 3 is the rebound plus the landing blend toward the next recorded key.
