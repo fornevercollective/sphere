@@ -4,11 +4,13 @@ Live attitude instrument. The gauge, the wire sphere, and the alignment plate re
 
 Open `index.html` in a browser.
 
-- [Zen](https://lang.ugrad.ai/zen.html) is the translator. The nav links to it. It does not run in this page.
+- [Zen](https://lang.ugrad.ai/zen.html) is the translator. The drawer links to it. It does not run in this page.
 - [KBatch](https://kbatch.ugrad.ai) is the path geometry. The codex uses its short-hop rule on one QWERTY: efficiency is 100 minus average key distance times 22.
-- [Qbit Globe](https://mueee.qbitos.ai/qbit-globe.html) is the menu this page follows.
+- [Qbit Globe](https://mueee.qbitos.ai/qbit-globe.html) is the letter wheel. This page links to it.
 
-`?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word.
+Sources opens a right drawer. The menu is a vertical edge rail — Live, Sphere, Bloch, Path, Codex, Cube, Flow, Rays, Tether, Sources — with 44px targets. SET, PART, LAYER, and the Zen, KBatch, and Globe links live in that drawer.
+
+`?plate=1` is the alignment strip. `?t=` seeks the event pass. `?menu=codex` opens the word board. `?word=` sets that word. `?sources=1` opens the drawer.
 
 Layer 1 is the requested attitude. Layer 2 counters the cleaned rate and slews with drag. Layer 3 is the rebound plus the landing blend toward the next recorded key.
 

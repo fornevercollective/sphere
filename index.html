@@ -5,36 +5,74 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sphere — attitude</title>
 <style>
-  :root { --dock: 228px; --plate: 168px; }
+  :root { --dock: 228px; --plate: 168px; --drawer: min(400px, 92vw); }
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #eee;
     font: 13px/1.35 "Avenir Next", "Helvetica Neue", Helvetica, sans-serif; }
   canvas#cv { display: block; width: 100%; height: 100%; touch-action: none; }
   #bar {
     position: fixed; z-index: 3; top: 0; left: 0; right: 0;
-    display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: center;
-    padding: 8px 12px;
+    display: flex; flex-wrap: nowrap; gap: 0; align-items: center;
+    padding: 0 52px 0 12px;
     background: #000;
     border-bottom: 1px solid #161616;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
   }
-  #bar span.k { color: #5a5a5a; letter-spacing: 0.14em; font-size: 10px; margin-left: 8px; }
-  #bar .brand { color: #f5f5f5; letter-spacing: 0.2em; font-size: 11px; font-weight: 500; margin-right: 4px; }
-  #bar a { color: #8d8d8d; text-decoration: none; padding: 3px 6px; letter-spacing: 0.04em; }
-  #bar a:hover { color: #f5f5f5; }
+  #bar .brand {
+    color: #f5f5f5; letter-spacing: 0.2em; font-size: 11px; font-weight: 500;
+    margin-right: 8px; flex: 0 0 auto;
+  }
+  #bar button {
+    flex: 0 0 auto; min-height: 44px; padding: 0 14px;
+  }
   button {
     background: transparent; color: #8d8d8d; border: 0; font: inherit;
     letter-spacing: 0.04em; cursor: pointer; padding: 3px 6px;
+    touch-action: manipulation;
   }
   button.on { color: #f5f5f5; }
+  #edge {
+    position: fixed; z-index: 6; top: 50%; right: 0;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column;
+    max-height: min(92vh, 740px); max-height: min(92dvh, 740px);
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y;
+    overscroll-behavior: contain;
+    transition: right .22s cubic-bezier(.2, .9, .2, 1);
+  }
+  body.sources-open #edge { right: var(--drawer); }
+  #edge button {
+    box-sizing: border-box;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    width: 44px; min-height: 44px; padding: 12px 4px;
+    border: 1px solid #2a2a2a; border-right: 0;
+    background: #000; color: #cfcfcf;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  #edge button + button { border-top: 0; }
+  #edge button:first-child { border-radius: 10px 0 0 0; }
+  #edge button:last-child { border-radius: 0 0 0 10px; }
+  #edge button.on { color: #fff; background: #141414; }
+  #scrim {
+    position: fixed; inset: 0; z-index: 4;
+    background: rgba(255, 255, 255, 0.06);
+    opacity: 0; pointer-events: none;
+    transition: opacity .22s ease;
+  }
+  body.sources-open #scrim { opacity: 1; pointer-events: auto; }
   #hint {
     position: fixed; left: 16px; bottom: calc(var(--dock) + var(--plate) + 6px); z-index: 3;
     color: #4a4a4a; font-size: 11px; letter-spacing: 0.08em;
   }
   #dock {
-    position: fixed; z-index: 3; left: 0; right: 0; bottom: 0; height: var(--dock);
+    position: fixed; z-index: 3; left: 0; right: 44px; bottom: 0; height: var(--dock);
     display: grid; grid-template-columns: 1.15fr 1.4fr 0.95fr 1.05fr; gap: 16px;
     box-sizing: border-box; padding: 10px 16px 12px;
     background: #000; border-top: 1px solid #242424; pointer-events: none;
   }
+  body.sources-open #dock { right: calc(var(--drawer) + 44px); }
   #dock section { min-width: 0; overflow: hidden; }
   #dock h2 {
     margin: 0 0 4px; font-size: 10px; font-weight: 500;
@@ -48,16 +86,49 @@
   #bl-spark { width: 100%; height: 42px; display: block; margin-top: 4px; }
   #cube-cv { width: 112px; height: 112px; flex: none; }
   #sheet {
-    position: fixed; z-index: 4; display: none;
-    top: 48px; right: 12px; bottom: calc(var(--dock) + var(--plate) + 8px); width: min(440px, 94vw);
-    overflow: auto; background: #070707; border: 1px solid #2a2a2a; padding: 8px 18px 28px;
+    position: fixed; z-index: 5; top: 0; right: 0; bottom: 0;
+    width: var(--drawer);
+    display: flex; flex-direction: column;
+    background: #000; border-left: 1px solid #2a2a2a;
+    transform: translate3d(100%, 0, 0);
+    transition: transform .22s cubic-bezier(.2, .9, .2, 1);
+    pointer-events: none;
   }
-  #sheet.open { display: block; }
+  #sheet.open { transform: translate3d(0, 0, 0); pointer-events: auto; }
+  #sheet .drw-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px 8px 16px; flex: 0 0 auto;
+    border-bottom: 1px solid #1c1c1c;
+  }
+  #sheet .drw-hd .ttl {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.14em; color: #f4f4f4;
+  }
+  #sheet .drw-hd button {
+    box-sizing: border-box;
+    width: 44px; height: 44px; padding: 0; border-radius: 22px;
+    background: #141414; color: #f4f4f4; font-size: 20px;
+  }
+  #sheet .drw-body {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; touch-action: pan-y;
+    overscroll-behavior: contain;
+    padding: 8px 12px 32px;
+  }
+  #sheet button.row.on { color: #fff; background: #141414; }
   #sheet h2 { font-weight: 500; font-size: 11px; letter-spacing: 0.16em; color: #777; margin: 18px 0 6px; }
-  #sheet a { color: #e8e8e8; text-decoration: none; }
-  #sheet a:hover { text-decoration: underline; }
-  #sheet li { margin: 7px 0; color: #9a9a9a; }
+  #sheet a, #sheet button.row {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px;
+    min-height: 44px;
+    padding: 8px 10px; box-sizing: border-box; width: 100%;
+    text-align: left; color: #e8e8e8; text-decoration: none;
+    border-bottom: 1px solid #161616;
+  }
+  #sheet a span, #sheet button.row span {
+    color: #8a8a8a; font-size: 12px; margin-left: 0;
+    flex: 1 1 12em; min-width: 0; line-height: 1.35;
+  }
   #sheet .lead { color: #9a9a9a; margin: 10px 0 0; }
+  #tether-read { color: #cfcfcf; white-space: pre-wrap; font-size: 12px; }
   #board {
     position: fixed; z-index: 4; display: none;
     top: 46px; left: 12px; width: min(420px, 46vw);
@@ -89,37 +160,45 @@
   body.plate #hint,
   body.plate #dock,
   body.plate #sheet,
+  body.plate #edge,
+  body.plate #scrim,
   body.plate #board { display: none !important; }
 </style>
 </head>
 <body>
 <div id="bar">
   <span class="brand">SPHERE</span>
+  <button type="button" data-menu="live">Live</button>
   <button type="button" data-menu="sphere" class="on">Sphere</button>
   <button type="button" data-menu="bloch">Bloch</button>
   <button type="button" data-menu="path">Path</button>
   <button type="button" data-menu="codex">Codex</button>
   <button type="button" data-menu="cube">Cube</button>
   <button type="button" data-menu="flow">Flow</button>
-  <span class="k">SET</span>
-  <button type="button" data-set="event">Event</button>
-  <button type="button" data-set="bloch">Bloch</button>
-  <button type="button" data-set="v1">v1</button>
-  <span class="k">PART</span>
-  <button type="button" data-part="rings" class="on">Rings</button>
-  <button type="button" data-part="nose" class="on">Nose</button>
-  <button type="button" data-part="trail" class="on">Trail</button>
-  <button type="button" data-part="shadow" class="on">Shadow</button>
-  <button type="button" data-part="horizon" class="on">Horizon</button>
-  <span class="k">LAYER</span>
-  <button type="button" data-part="l1" class="on">L1</button>
-  <button type="button" data-part="l2" class="on">L2</button>
-  <button type="button" data-part="l3" class="on">L3</button>
-  <a href="https://lang.ugrad.ai/zen.html">Zen</a>
-  <a href="https://kbatch.ugrad.ai">KBatch</a>
-  <a href="https://mueee.qbitos.ai/qbit-globe.html">Globe</a>
-  <button type="button" id="sources">Sources</button>
+  <button type="button" data-menu="rays">Rays</button>
+  <button type="button" data-action="tether">Tether</button>
+  <button type="button" data-action="sources" id="sources">Sources</button>
 </div>
+<nav id="edge" aria-label="Menu">
+  <button type="button" data-menu="live">Live</button>
+  <button type="button" data-menu="sphere" class="on">Sphere</button>
+  <button type="button" data-menu="bloch">Bloch</button>
+  <button type="button" data-menu="path">Path</button>
+  <button type="button" data-menu="codex">Codex</button>
+  <button type="button" data-menu="cube">Cube</button>
+  <button type="button" data-menu="flow">Flow</button>
+  <button type="button" data-menu="rays">Rays</button>
+  <button type="button" data-action="tether">Tether</button>
+  <button type="button" data-action="sources">Sources</button>
+</nav>
+<div id="scrim"></div>
+<aside id="sheet" aria-label="Sources">
+  <div class="drw-hd">
+    <span class="ttl">SOURCES</span>
+    <button type="button" id="src-close" aria-label="Close">×</button>
+  </div>
+  <div class="drw-body" id="sheet-body"></div>
+</aside>
 <canvas id="cv"></canvas>
 <div id="hint">event pass drives the gauge · space pauses</div>
 <footer id="dock">
@@ -162,7 +241,6 @@
     </div>
   </section>
 </footer>
-<aside id="sheet"></aside>
 <aside id="board">
   <h2>CODEX</h2>
   <p class="dim">One QWERTY. Efficiency is 100 minus average key distance times 22. Zen, KBatch, and the globe stay on their pages.</p>
@@ -219,9 +297,9 @@
       ['quantum gutter', 'https://mueee.qbitos.ai/quantum-gutter.html', 'Prefix lane. The posted bloch-state line is the token this page actually sends']
     ]],
     ['Nav', [
-      ['Zen', 'https://lang.ugrad.ai/zen.html', 'Translator. Linked in the bar. It does not run in this page'],
+      ['Zen', 'https://lang.ugrad.ai/zen.html', 'Translator. In this drawer. It does not run in this page'],
       ['KBatch', 'https://kbatch.ugrad.ai', 'Path geometry. The codex uses its short-hop rule on one QWERTY'],
-      ['Globe', 'https://mueee.qbitos.ai/qbit-globe.html', 'The menu follows that page. The letter wheel stays there']
+      ['Globe', 'https://mueee.qbitos.ai/qbit-globe.html', 'Letter wheel. Linked here. The wheel stays on that page']
     ]],
     ['KBatch', [
       ['kbatch', 'https://kbatch.ugrad.ai', 'Path geometry. Trail efficiency below uses the short-hop rule, on the nose trail'],
@@ -294,8 +372,9 @@
   let setName = params.get('set') || 'event';
   if (setName !== 'bloch' && setName !== 'v1') setName = 'event';
   let menuName = params.get('menu') || (setName === 'bloch' ? 'bloch' : 'sphere');
-  if (['sphere', 'bloch', 'path', 'codex', 'cube', 'flow'].indexOf(menuName) < 0) menuName = 'sphere';
+  if (['live', 'sphere', 'bloch', 'path', 'codex', 'cube', 'flow', 'rays', 'tether'].indexOf(menuName) < 0) menuName = 'sphere';
   if (!params.get('set') && menuName === 'bloch') setName = 'bloch';
+  if (!params.get('set') && menuName === 'live') setName = 'event';
   if (params.get('word')) wordInput.value = params.get('word').slice(0, 64);
   const parts = { rings: true, nose: true, trail: true, shadow: true, horizon: true, l1: true, l2: true, l3: true };
   let t0 = performance.now() - (Number(params.get('t')) || 0) * 1000;
@@ -1359,6 +1438,17 @@
         + ' · clean ' + coords.rate.clean[0].toFixed(0) + ' ' + coords.rate.clean[1].toFixed(0)
         + ' · raw ' + coords.rate.raw[0].toFixed(0) + ' ' + coords.rate.raw[1].toFixed(0);
     }
+    const read = document.getElementById('tether-read');
+    if (read) {
+      const p = coords.l1;
+      read.textContent = tetherState + '  ' + window.SphereTether.url
+        + '\nt ' + coords.t.toFixed(2)
+        + '  x ' + p.x.toFixed(2) + '  y ' + p.y.toFixed(2) + '  z ' + p.z.toFixed(2)
+        + '\nproj ' + p.proj.x.toFixed(2) + ' ' + p.proj.y.toFixed(2)
+        + '  L1 ' + p.pitch.toFixed(1) + '° ' + p.yaw.toFixed(1) + '°'
+        + '\nL2 ' + coords.l2.pitch.toFixed(1) + '° ' + coords.l2.yaw.toFixed(1) + '°'
+        + '  L3 ' + coords.l3.pitch.toFixed(1) + '° ' + coords.l3.yaw.toFixed(1) + '°';
+    }
   }
   function connectTether() {
     if (!window.WebSocket) return;
@@ -1542,14 +1632,19 @@
     const barH = plateOn ? 0 : Math.ceil(document.getElementById('bar').getBoundingClientRect().height);
     const boardOpen = !plateOn && board.classList.contains('open');
     const boardW = boardOpen ? Math.ceil(board.getBoundingClientRect().right) + 8 : 0;
+    const edgeEl = document.getElementById('edge');
+    const edgeW = plateOn ? 0 : Math.ceil(edgeEl.getBoundingClientRect().width) || 44;
+    const drawerW = (!plateOn && document.body.classList.contains('sources-open'))
+      ? Math.ceil(sheet.getBoundingClientRect().width) : 0;
+    const rightW = edgeW + drawerW;
     hint.style.left = boardW ? (boardW + 8) + 'px' : '16px';
     const plateH = Math.min(bandHeight(), Math.max(120, h - dockH - barH - 40));
     const plateY = h - dockH - plateH;
     ctx.save();
     ctx.translate(boardW, 0);
-    drawStage(ctx, barH, Math.max(240, w - boardW), Math.max(40, plateY - barH), pose, viewNose, viewTrail, nextNose, viewWord);
+    drawStage(ctx, barH, Math.max(240, w - boardW - rightW), Math.max(40, plateY - barH), pose, viewNose, viewTrail, nextNose, viewWord);
     ctx.restore();
-    drawPlate(ctx, plateY, w, plateH, pose, viewNose, viewTrail, viewWord);
+    drawPlate(ctx, plateY, Math.max(240, w - rightW), plateH, pose, viewNose, viewTrail, viewWord);
     if (!plateOn) paintDock(viewNose, rawTrail);
     publish(viewNose);
     publishCoords(pose, viewNose);
@@ -1559,6 +1654,7 @@
   function mark() {
     document.querySelectorAll('[data-set]').forEach((b) => b.classList.toggle('on', b.dataset.set === setName));
     document.querySelectorAll('[data-menu]').forEach((b) => b.classList.toggle('on', b.dataset.menu === menuName));
+    document.querySelectorAll('[data-part]').forEach((b) => b.classList.toggle('on', !!parts[b.dataset.part]));
     const name = setName === 'event' ? 'event pass' : setName === 'bloch' ? 'bloch estimator' : 'v1 still';
     hint.textContent = name + ' is L1 · L2 counters · L3 lands · ' + (paused ? 'paused · space runs' : 'drag rotates · space pauses');
   }
@@ -1570,51 +1666,162 @@
     const node = document.getElementById(id);
     if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
   }
-  document.getElementById('bar').addEventListener('click', (e) => {
+  function setSources(open) {
+    sheet.classList.toggle('open', open);
+    document.body.classList.toggle('sources-open', open);
+  }
+  function applyMenu(name) {
+    menuName = name;
+    if (name === 'live') {
+      setName = 'event';
+      paused = false;
+      t0 = performance.now() - held;
+    } else if (name === 'sphere') {
+      setName = 'event';
+      t0 = performance.now() - held;
+    } else if (name === 'bloch') {
+      setName = 'bloch';
+      ensureBloch();
+    } else if (name === 'path') {
+      parts.trail = true;
+    } else if (name === 'rays') {
+      parts.nose = true;
+      parts.trail = true;
+      parts.l1 = true;
+      parts.l2 = true;
+      parts.l3 = true;
+    }
+    openBoard(name);
+  }
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(function () {});
+    }
+  }
+  function drawerRow(attr, label, note) {
+    return '<button type="button" class="row" ' + attr + '>' + label + '<span>' + note + '</span></button>';
+  }
+  function fillDrawer() {
+    const body = document.getElementById('sheet-body');
+    const menus = [
+      ['live', 'Live', 'Event pass running'],
+      ['sphere', 'Sphere', 'Gauge and the three layers'],
+      ['bloch', 'Bloch', 'Estimator sample'],
+      ['path', 'Path', 'Travel trail on'],
+      ['codex', 'Codex', 'One QWERTY word'],
+      ['cube', 'Cube', 'Nose plus the word path'],
+      ['flow', 'Flow', 'Bigram hops'],
+      ['rays', 'Rays', 'Force, counter, bend, travel']
+    ];
+    const sets = [
+      ['event', 'Event', 'Recording keys'],
+      ['bloch', 'Bloch', 'Estimator'],
+      ['v1', 'v1', 'Pitch 106° still']
+    ];
+    const partRows = [
+      ['rings', 'Rings', 'World cage'],
+      ['nose', 'Nose', 'L1 marker'],
+      ['trail', 'Trail', 'Smoothed travel'],
+      ['shadow', 'Shadow', 'Equator drop'],
+      ['horizon', 'Horizon', 'Next key']
+    ];
+    const layers = [
+      ['l1', 'L1', 'Requested rotation'],
+      ['l2', 'L2', 'Counter and drag'],
+      ['l3', 'L3', 'Rebound and landing']
+    ];
+    let html = '<h2>MENU</h2>' + menus.map(function (m) {
+      return drawerRow('data-menu="' + m[0] + '"', m[1], m[2]);
+    }).join('');
+    html += drawerRow('data-action="tether"', 'Tether', 'Coordinate fix');
+    html += '<h2>SET</h2>' + sets.map(function (m) {
+      return drawerRow('data-set="' + m[0] + '"', m[1], m[2]);
+    }).join('');
+    html += '<h2>PART</h2>' + partRows.map(function (m) {
+      return drawerRow('data-part="' + m[0] + '"', m[1], m[2]);
+    }).join('');
+    html += '<h2>LAYER</h2>' + layers.map(function (m) {
+      return drawerRow('data-part="' + m[0] + '"', m[1], m[2]);
+    }).join('');
+    html += '<h2 id="tether-sec">TETHER</h2>';
+    html += '<p id="tether-read">' + window.SphereTether.url + '</p>';
+    html += drawerRow('id="tether-copy"', 'Copy', 'Latest JSON');
+    html += '<p class="lead">The dock computes the slices that read this sample. FlexGlue, splats, Unitree, EMG, BCI, and the MPC playground stay on their own pages.</p>';
+    html += SOURCES.map(function (group) {
+      const items = group[1].map(function (row) {
+        if (row[1].indexOf('ws:') === 0) {
+          return drawerRow('data-action="copy-url" data-url="' + row[1] + '"', row[0], row[2]);
+        }
+        const ext = row[1].indexOf('http') === 0;
+        return '<a class="row" href="' + row[1] + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + row[0] + '<span>' + row[2] + '</span></a>';
+      }).join('');
+      return '<h2>' + group[0] + '</h2>' + items;
+    }).join('');
+    body.innerHTML = html;
+  }
+  fillDrawer();
+
+  document.addEventListener('click', (e) => {
+    if (e.target.id === 'scrim') {
+      setSources(false);
+      return;
+    }
     const b = e.target.closest('button');
-    if (!b || b.id === 'sources') return;
+    if (!b) return;
+    if (b.id === 'src-close') {
+      setSources(false);
+      return;
+    }
+    if (b.dataset.action === 'sources') {
+      setSources(!sheet.classList.contains('open'));
+      return;
+    }
+    if (b.dataset.action === 'tether') {
+      menuName = 'tether';
+      openBoard('tether');
+      setSources(true);
+      const sec = document.getElementById('tether-sec');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' });
+      mark();
+      return;
+    }
+    if (b.id === 'tether-copy') {
+      copyText(JSON.stringify(window.SphereTether.latest || {}, null, 2));
+      return;
+    }
+    if (b.dataset.action === 'copy-url' && b.dataset.url) {
+      copyText(b.dataset.url);
+      return;
+    }
     if (b.dataset.menu) {
-      menuName = b.dataset.menu;
-      if (menuName === 'sphere') {
-        setName = 'event';
-        t0 = performance.now() - held;
-      } else if (menuName === 'bloch') {
-        setName = 'bloch';
-        ensureBloch();
-      } else if (menuName === 'path') {
-        parts.trail = true;
-        const trailBtn = document.querySelector('[data-part="trail"]');
-        if (trailBtn) trailBtn.classList.add('on');
-      }
-      openBoard(menuName);
+      applyMenu(b.dataset.menu);
+      mark();
+      return;
     }
     if (b.dataset.set) {
       setName = b.dataset.set;
       if (setName === 'bloch') {
         ensureBloch();
-        if (menuName === 'sphere') menuName = 'bloch';
+        if (menuName === 'sphere' || menuName === 'live') menuName = 'bloch';
       }
       if (setName === 'event') t0 = performance.now() - held;
       if (setName !== 'bloch' && menuName === 'bloch') menuName = 'sphere';
+      mark();
+      return;
     }
     if (b.dataset.part) {
       parts[b.dataset.part] = !parts[b.dataset.part];
-      b.classList.toggle('on', parts[b.dataset.part]);
+      mark();
     }
-    mark();
   });
-  document.getElementById('sources').addEventListener('click', () => sheet.classList.toggle('open'));
-
-  sheet.innerHTML = '<p class="lead">The dock computes the slices that read this sample. FlexGlue, splats, Unitree, EMG, BCI, and the MPC playground stay on their own pages.</p>'
-    + SOURCES.map((group) => {
-      const items = group[1].map((row) => {
-        return '<li><a href="' + row[1] + '">' + row[0] + '</a> — ' + row[2] + '</li>';
-      }).join('');
-      return '<h2>' + group[0] + '</h2><ul>' + items + '</ul>';
-    }).join('');
 
   window.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Escape') {
+      setSources(false);
+      return;
+    }
+    if (e.code !== 'Space') return;
     e.preventDefault();
     paused = !paused;
     if (!paused) t0 = performance.now() - held;
@@ -1661,9 +1868,19 @@
     const n = Math.min(3600, Math.round(bt * 60));
     for (let i = 0; i < n; i++) window.RoadsterBloch.step(bloch, 1 / 60);
   }
-  if (params.has('sources')) sheet.classList.add('open');
-  if (menuName === 'path') parts.trail = true;
+  if (menuName === 'path' || menuName === 'rays') parts.trail = true;
+  if (menuName === 'rays') {
+    parts.nose = true;
+    parts.l1 = true;
+    parts.l2 = true;
+    parts.l3 = true;
+  }
+  if (params.has('sources') || menuName === 'tether') setSources(true);
   openBoard(menuName);
+  if (menuName === 'tether') {
+    const sec = document.getElementById('tether-sec');
+    if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' });
+  }
   syncPlate();
   el.v1Ch.textContent = V1_CHANNELS;
   mark();
